@@ -1,0 +1,2896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finance &amp; Hubbly Reseller Tracker</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- jsPDF: builds the downloadable PDF slip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #ffffff;
+      color: #000000;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Minimal monochrome scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f4f4f5;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #a1a1aa;
+      border-radius: 2px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #000000;
+    }
+
+    /* Print: only the receipt is printed / saved as PDF */
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      body > *:not(#receipt-modal) {
+        display: none !important;
+      }
+      #receipt-modal {
+        position: static !important;
+        background: #ffffff !important;
+        display: block !important;
+        padding: 0 !important;
+        overflow: visible !important;
+      }
+      #receipt-modal > div {
+        box-shadow: none !important;
+        border: 0 !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .receipt-scroll {
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-white text-black flex flex-col antialiased selection:bg-black selection:text-white">
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Header & Navigation -->
+  <header class="border-b-2 border-black bg-white sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col sm:flex-row items-center justify-between py-4 gap-4">
+        <!-- Logo / Title -->
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <div class="h-10 w-10 bg-black text-white flex items-center justify-center font-black text-xl rounded-none">
+            <i class="ph-bold ph-scales"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-black tracking-tight uppercase flex items-center gap-2">
+              DualTrack Hub
+              <span class="text-[11px] px-2 py-0.5 border border-black font-mono font-bold bg-zinc-100">ZAR (R)</span>
+            </h1>
+            <p class="text-xs text-zinc-600 font-medium">Personal Finances &amp; Hubbly Reseller System</p>
+          </div>
+        </div>
+
+        <!-- Section Switcher Tabs -->
+        <nav class="flex border-2 border-black bg-white p-1 w-full sm:w-auto justify-center gap-1">
+          <button id="tab-finance-btn" onclick="switchTab('finance')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider transition-all bg-black text-white">
+            <i class="ph-bold ph-wallet"></i>
+            <span>Finance Tracker</span>
+          </button>
+          <button id="tab-business-btn" onclick="switchTab('business')" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider transition-all text-black hover:bg-zinc-100">
+            <i class="ph-bold ph-storefront"></i>
+            <span>Reseller Business Track</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- ========================================== -->
+    <!-- SECTION 1: FINANCE TRACKER                 -->
+    <!-- ========================================== -->
+    <section id="section-finance" class="space-y-8">
+      <!-- Title Bar -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b-2 border-black pb-4">
+        <div>
+          <h2 class="text-2xl font-black uppercase tracking-tight text-black">
+            Finance Tracker
+          </h2>
+          <p class="text-xs text-zinc-600 mt-0.5">Control daily personal cashflow, income sources, and expenditures.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="exportFinanceData()" class="px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider bg-white hover:bg-black hover:text-white text-black border-2 border-black transition flex items-center gap-1.5">
+            <i class="ph-bold ph-download-simple"></i> Backup
+          </button>
+          <button onclick="clearFinanceData()" class="px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider bg-white hover:bg-black hover:text-white text-black border-2 border-black transition flex items-center gap-1.5">
+            <i class="ph-bold ph-trash"></i> Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Total Income -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold uppercase tracking-widest text-zinc-600">Total Income</span>
+            <span class="text-xs font-bold border border-black px-1.5 py-0.5 bg-zinc-100 font-mono">IN</span>
+          </div>
+          <div class="text-3xl font-black font-mono text-black" id="fin-total-income">R0.00</div>
+          <p class="text-xs text-zinc-600 mt-1 font-medium" id="fin-income-count">0 recorded entries</p>
+        </div>
+
+        <!-- Total Expense -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold uppercase tracking-widest text-zinc-600">Total Expense</span>
+            <span class="text-xs font-bold border border-black px-1.5 py-0.5 bg-zinc-100 font-mono">OUT</span>
+          </div>
+          <div class="text-3xl font-black font-mono text-black" id="fin-total-expense">R0.00</div>
+          <p class="text-xs text-zinc-600 mt-1 font-medium" id="fin-expense-count">0 recorded entries</p>
+        </div>
+
+        <!-- Net Balance -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold uppercase tracking-widest text-zinc-600">Net Balance</span>
+            <span class="text-xs font-bold border border-black px-1.5 py-0.5 bg-zinc-100 font-mono" id="fin-balance-tag">BAL</span>
+          </div>
+          <div class="text-3xl font-black font-mono text-black" id="fin-net-balance">R0.00</div>
+          <div class="flex items-center gap-2 mt-2">
+            <div class="w-full bg-zinc-200 h-2 border border-black overflow-hidden">
+              <div id="fin-health-bar" class="bg-black h-full" style="width: 0%;"></div>
+            </div>
+            <span class="text-[11px] font-mono font-bold whitespace-nowrap" id="fin-savings-rate">0% saved</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Forms -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Add Income Card -->
+        <div class="border-2 border-black bg-white p-6 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between mb-4 pb-3 border-b-2 border-black">
+            <h3 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+              <i class="ph-bold ph-arrow-down-left"></i> Add Income
+            </h3>
+            <span class="text-[10px] uppercase font-mono font-bold px-2 py-0.5 border border-black bg-zinc-100">+ Credit</span>
+          </div>
+          <form id="income-form" onsubmit="handleFinanceSubmit(event, 'income')" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Source / Name</label>
+                <input type="text" id="income-name" placeholder="Salary, Side Hustle, etc." required class="w-full bg-white border-2 border-black px-3.5 py-2.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Amount (R)</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center font-mono font-bold text-xs text-black">R</span>
+                  <input type="number" id="income-amount" step="0.01" min="0.01" placeholder="0.00" required class="w-full bg-white border-2 border-black pl-8 pr-3.5 py-2.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-mono font-semibold" />
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Category</label>
+                <select id="income-category" class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black focus:outline-none focus:bg-zinc-50 font-medium">
+                  <option value="Salary">Salary</option>
+                  <option value="Business Profit">Business Profit</option>
+                  <option value="Allowance">Allowance</option>
+                  <option value="Investments">Investments</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Date</label>
+                <input type="date" id="income-date" class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black focus:outline-none focus:bg-zinc-50 font-mono font-medium" />
+              </div>
+            </div>
+            <button type="submit" class="w-full py-3 px-4 bg-black text-white font-bold text-xs uppercase tracking-widest hover:bg-zinc-800 transition flex items-center justify-center gap-2 border-2 border-black">
+              <i class="ph-bold ph-plus"></i> Record Income
+            </button>
+          </form>
+        </div>
+
+        <!-- Add Expense Card -->
+        <div class="border-2 border-black bg-white p-6 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between mb-4 pb-3 border-b-2 border-black">
+            <h3 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+              <i class="ph-bold ph-arrow-up-right"></i> Add Expense
+            </h3>
+            <span class="text-[10px] uppercase font-mono font-bold px-2 py-0.5 border border-black bg-zinc-100">- Debit</span>
+          </div>
+          <form id="expense-form" onsubmit="handleFinanceSubmit(event, 'expense')" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Expense Name</label>
+                <input type="text" id="expense-name" placeholder="Groceries, Fuel, Stock, etc." required class="w-full bg-white border-2 border-black px-3.5 py-2.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Amount (R)</label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center font-mono font-bold text-xs text-black">R</span>
+                  <input type="number" id="expense-amount" step="0.01" min="0.01" placeholder="0.00" required class="w-full bg-white border-2 border-black pl-8 pr-3.5 py-2.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-mono font-semibold" />
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Category</label>
+                <select id="expense-category" class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black focus:outline-none focus:bg-zinc-50 font-medium">
+                  <option value="Living / Food">Living / Food</option>
+                  <option value="Rent / Housing">Rent / Housing</option>
+                  <option value="Transport / Petrol">Transport / Petrol</option>
+                  <option value="Stock / Business">Stock / Business Investment</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Utilities / Airtime">Utilities / Airtime</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Date</label>
+                <input type="date" id="expense-date" class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black focus:outline-none focus:bg-zinc-50 font-mono font-medium" />
+              </div>
+            </div>
+            <button type="submit" class="w-full py-3 px-4 bg-white text-black font-bold text-xs uppercase tracking-widest hover:bg-black hover:text-white transition flex items-center justify-center gap-2 border-2 border-black">
+              <i class="ph-bold ph-plus"></i> Record Expense
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Transaction List & Summary Card -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- History Table (2 cols) -->
+        <div class="lg:col-span-2 border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4 pb-3 border-b-2 border-black">
+            <h3 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+              <i class="ph-bold ph-list-dashes"></i> Transaction Ledger
+            </h3>
+            <!-- Filter Pills -->
+            <div class="flex items-center gap-1 border border-black p-0.5 bg-zinc-100 text-xs">
+              <button onclick="setFinanceFilter('all')" id="fin-filter-all" class="px-3 py-1 font-bold uppercase text-[10px] bg-black text-white">All</button>
+              <button onclick="setFinanceFilter('income')" id="fin-filter-income" class="px-3 py-1 font-bold uppercase text-[10px] text-zinc-700 hover:text-black">Income</button>
+              <button onclick="setFinanceFilter('expense')" id="fin-filter-expense" class="px-3 py-1 font-bold uppercase text-[10px] text-zinc-700 hover:text-black">Expense</button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-left text-xs">
+              <thead class="uppercase bg-zinc-100 text-black border-y-2 border-black font-bold sticky top-0">
+                <tr>
+                  <th class="py-2.5 px-3">Description</th>
+                  <th class="py-2.5 px-3">Date</th>
+                  <th class="py-2.5 px-3 text-right">Amount</th>
+                  <th class="py-2.5 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="finance-table-body" class="divide-y border-b border-black divide-zinc-200">
+                <!-- Javascript Injection -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Summary Box -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000] flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4 pb-3 border-b-2 border-black">
+              <h3 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+                <i class="ph-bold ph-file-text"></i> Summary
+              </h3>
+              <span class="text-[10px] font-mono font-bold uppercase text-zinc-600">Overview</span>
+            </div>
+
+            <div class="space-y-4 text-xs">
+              <div class="border border-black p-3 bg-zinc-50">
+                <span class="text-[10px] uppercase font-bold tracking-widest text-zinc-500 block mb-1">Cashflow Status</span>
+                <p id="fin-status-text" class="font-black uppercase text-black text-sm">Balanced</p>
+                <p class="text-xs text-zinc-600 mt-1 font-medium" id="fin-status-desc">All activity computed.</p>
+              </div>
+
+              <div>
+                <span class="text-[10px] font-black uppercase tracking-wider text-zinc-600">Top Outgoing Categories</span>
+                <div id="fin-category-breakdown" class="mt-2 space-y-2.5">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-3 border-t border-black text-[11px] font-mono text-zinc-500 text-center uppercase">
+            Updated in real-time
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SECTION 2: RESELLER BUSINESS TRACK         -->
+    <!-- ========================================== -->
+    <section id="section-business" class="space-y-8 hidden">
+      <!-- Title Bar -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b-2 border-black pb-4">
+        <div>
+          <h2 class="text-2xl font-black uppercase tracking-tight text-black">
+            Reseller Business Track
+          </h2>
+          <p class="text-xs text-zinc-600 mt-0.5">Hubbly inventory guide, customer sales register &amp; block debt tracker.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="exportBusinessData()" class="px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider bg-white hover:bg-black hover:text-white text-black border-2 border-black transition flex items-center gap-1.5">
+            <i class="ph-bold ph-download-simple"></i> Export Sales
+          </button>
+          <button onclick="clearBusinessData()" class="px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider bg-white hover:bg-black hover:text-white text-black border-2 border-black transition flex items-center gap-1.5">
+            <i class="ph-bold ph-trash"></i> Reset Data
+          </button>
+        </div>
+      </div>
+
+      <!-- Reference Notebook Stock & Selling Price Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Stock Purchase Cost Guide -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between mb-3 border-b-2 border-black pb-2">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-package text-base text-black"></i>
+              <h3 class="font-black text-sm uppercase tracking-wider text-black">Stock Prices (Cost)</h3>
+            </div>
+            <span class="text-[10px] font-mono font-bold uppercase border border-black px-2 py-0.5 bg-zinc-100">Wholesale</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="border border-black p-2 bg-zinc-50 flex justify-between items-center">
+              <span class="font-semibold text-zinc-800">(80) Nasty Charcoal</span>
+              <span class="font-mono font-black text-black">R75</span>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50 flex justify-between items-center">
+              <span class="font-semibold text-zinc-800">(10) Flavours</span>
+              <span class="font-mono font-black text-black">R295</span>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50 flex justify-between items-center">
+              <span class="font-semibold text-zinc-800">(96) Cubes</span>
+              <span class="font-mono font-black text-black">R60</span>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50 flex justify-between items-center">
+              <span class="font-semibold text-zinc-800">(50) Foil</span>
+              <span class="font-mono font-black text-black">R15 / R20</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selling Prices Menu -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between mb-3 border-b-2 border-black pb-2">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-tag text-base text-black"></i>
+              <h3 class="font-black text-sm uppercase tracking-wider text-black">Selling Prices (Retail)</h3>
+            </div>
+            <span class="text-[10px] font-mono font-bold uppercase border border-black px-2 py-0.5 bg-black text-white">Menu</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+            <div class="border border-black p-2 bg-zinc-50">
+              <div class="text-[10px] uppercase font-bold text-zinc-500">Flavour</div>
+              <div class="font-mono font-black text-black text-sm">R60</div>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50">
+              <div class="text-[10px] uppercase font-bold text-zinc-500">Charcoal Single</div>
+              <div class="font-mono font-black text-black text-sm">R3</div>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50">
+              <div class="text-[10px] uppercase font-bold text-zinc-500">Charcoal (10)</div>
+              <div class="font-mono font-black text-black text-sm">R20</div>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50">
+              <div class="text-[10px] uppercase font-bold text-zinc-500">3 Cube Charcoal</div>
+              <div class="font-mono font-black text-black text-sm">R10</div>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50">
+              <div class="text-[10px] uppercase font-bold text-zinc-500">Foil Sheet</div>
+              <div class="font-mono font-black text-black text-sm">R1</div>
+            </div>
+            <div class="border border-black p-2 bg-zinc-50">
+              <div class="text-[10px] uppercase font-bold text-zinc-500">Foil (Heavy)</div>
+              <div class="font-mono font-black text-black text-sm">R2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- LIVE STOCK & INVENTORY TRACKER BLOCK       -->
+      <!-- ========================================== -->
+      <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pb-3 border-b-2 border-black">
+          <div>
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-warehouse text-lg text-black"></i>
+              <h3 class="font-black text-base uppercase tracking-wider text-black">Live Stock &amp; Inventory Tracker</h3>
+            </div>
+            <p class="text-xs text-zinc-600 mt-0.5">Auto-decrements with each sale. Alerts you when restock is needed.</p>
+          </div>
+          <button onclick="openRestockModal()" class="px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider bg-black text-white hover:bg-zinc-800 transition flex items-center gap-1.5 border-2 border-black">
+            <i class="ph-bold ph-plus-circle"></i> Quick Restock / Add Stock
+          </button>
+        </div>
+
+        <!-- Low Stock Warning Banner (Visible if any item <= minThreshold) -->
+        <div id="restock-warning-banner" class="hidden mb-4 p-3 border-2 border-black bg-zinc-100 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="border border-black bg-black text-white px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase">[RESTOCK ALERT]</span>
+            <span id="restock-warning-items" class="text-xs font-bold uppercase text-black font-mono"></span>
+          </div>
+          <span class="text-[10px] font-mono text-zinc-600 uppercase font-semibold">Order supplies promptly</span>
+        </div>
+
+        <!-- Inventory Grid -->
+        <div id="stock-cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <!-- Rendered dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- ========================================== -->
+      <!-- HUBBLY FLAVOURS + BEST SELLERS             -->
+      <!-- ========================================== -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Hubbly Flavours -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between mb-3 pb-3 border-b-2 border-black">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-flask text-base text-black"></i>
+              <h3 class="font-black text-sm uppercase tracking-wider text-black">Hubbly Flavours</h3>
+            </div>
+            <span id="flavour-count-badge" class="text-[10px] font-mono font-bold uppercase border border-black px-2 py-0.5 bg-zinc-100">0 available</span>
+          </div>
+          <p class="text-[11px] text-zinc-600 mb-3">Tap a flavour to mark it available or sold out. Only available flavours can be picked when you add a sale.</p>
+
+          <div id="flavour-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- Rendered dynamically by JS -->
+          </div>
+
+          <form onsubmit="handleAddFlavour(event)" class="mt-4 pt-3 border-t border-black flex gap-2">
+            <input type="text" id="new-flavour-name" maxlength="40" placeholder="Add a new flavour..." class="flex-1 min-w-0 bg-white border-2 border-black px-3 py-2 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+            <button type="submit" class="px-4 py-2 bg-black text-white font-bold text-xs uppercase tracking-wider hover:bg-zinc-800 transition flex items-center gap-1.5 border-2 border-black">
+              <i class="ph-bold ph-plus"></i> Add
+            </button>
+          </form>
+        </div>
+
+        <!-- Best Sellers -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3 pb-3 border-b-2 border-black">
+            <div class="flex items-center gap-2">
+              <i class="ph-bold ph-trophy text-base text-black"></i>
+              <h3 class="font-black text-sm uppercase tracking-wider text-black">Best Sellers</h3>
+            </div>
+            <div class="flex items-center gap-1 border border-black p-0.5 bg-zinc-100 text-xs">
+              <button onclick="setTopSort('qty')" id="top-sort-qty" class="px-3 py-1 font-bold uppercase text-[10px] bg-black text-white">Qty</button>
+              <button onclick="setTopSort('orders')" id="top-sort-orders" class="px-3 py-1 font-bold uppercase text-[10px] text-zinc-700 hover:text-black">Orders</button>
+              <button onclick="setTopSort('revenue')" id="top-sort-revenue" class="px-3 py-1 font-bold uppercase text-[10px] text-zinc-700 hover:text-black">Revenue</button>
+            </div>
+          </div>
+
+          <div id="top-seller-headline" class="border border-black bg-zinc-50 p-2.5 text-[11px] font-mono font-bold uppercase mb-3"></div>
+
+          <span class="text-[10px] font-black uppercase tracking-wider text-zinc-600">By product</span>
+          <div id="top-groups-list" class="mt-2 mb-4 space-y-2.5"></div>
+
+          <span class="text-[10px] font-black uppercase tracking-wider text-zinc-600">By hubbly flavour</span>
+          <div id="top-flavours-list" class="mt-2 space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
+
+          <p class="mt-3 text-[10px] font-mono text-zinc-500 uppercase">Counts every recorded order, paid or owing.</p>
+        </div>
+      </div>
+
+      <!-- Business Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Collected Cash -->
+        <div class="border-2 border-black bg-white p-4 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between text-zinc-600 text-[11px] uppercase font-bold mb-1">
+            <span>Collected Cash</span>
+            <i class="ph-bold ph-check text-black"></i>
+          </div>
+          <div class="text-2xl font-black font-mono text-black" id="biz-total-paid">R0.00</div>
+          <span class="text-[10px] text-zinc-500 font-mono">Paid orders in full</span>
+        </div>
+
+        <!-- Outstanding Debt -->
+        <div class="border-2 border-black bg-white p-4 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between text-zinc-600 text-[11px] uppercase font-bold mb-1">
+            <span>Unpaid / Debt</span>
+            <i class="ph-bold ph-hourglass text-black"></i>
+          </div>
+          <div class="text-2xl font-black font-mono text-black" id="biz-total-debt">R0.00</div>
+          <span class="text-[10px] text-zinc-500 font-mono" id="biz-debtor-count">0 debtors</span>
+        </div>
+
+        <!-- Total Booked Sales -->
+        <div class="border-2 border-black bg-white p-4 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between text-zinc-600 text-[11px] uppercase font-bold mb-1">
+            <span>Gross Sales</span>
+            <i class="ph-bold ph-chart-line text-black"></i>
+          </div>
+          <div class="text-2xl font-black font-mono text-black" id="biz-gross-sales">R0.00</div>
+          <span class="text-[10px] text-zinc-500 font-mono">Paid + Unpaid</span>
+        </div>
+
+        <!-- Units Sold -->
+        <div class="border-2 border-black bg-white p-4 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex items-center justify-between text-zinc-600 text-[11px] uppercase font-bold mb-1">
+            <span>Items Sold</span>
+            <i class="ph-bold ph-shopping-cart text-black"></i>
+          </div>
+          <div class="text-2xl font-black font-mono text-black" id="biz-items-sold">0</div>
+          <span class="text-[10px] text-zinc-500 font-mono">Total product units</span>
+        </div>
+      </div>
+
+      <!-- Customer Tracker Input Section -->
+      <div class="border-2 border-black bg-white p-6 shadow-[4px_4px_0px_0px_#000]">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b-2 border-black">
+          <h3 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+            <i class="ph-bold ph-user-plus"></i> Customer Order Tracker
+          </h3>
+          <div class="flex items-center gap-2">
+            <span id="loyalty-indicator-badge" class="text-[10px] font-mono font-bold uppercase border border-black px-2 py-0.5 bg-zinc-100 hidden"></span>
+            <span class="text-[10px] font-mono font-bold uppercase border border-black px-2 py-0.5 bg-zinc-100">Direct Entry</span>
+          </div>
+        </div>
+
+        <form id="business-sale-form" onsubmit="handleSaleSubmit(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Customer Name -->
+            <div class="relative">
+              <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1 flex items-center justify-between">
+                <span>Customer Name / No.</span>
+                <span id="cust-order-count-hint" class="font-mono text-[10px] text-zinc-500 normal-case font-bold"></span>
+              </label>
+              <input type="text" id="cust-name" oninput="onCustomerNameInput()" placeholder="e.g. Sipho or AWC001" required autocomplete="off" class="w-full bg-white border-2 border-black px-3.5 py-2.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+              <!-- Customer repeat suggestions dropdown if existing -->
+              <div id="cust-autocomplete-list" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border-2 border-black z-20 shadow-[3px_3px_0px_0px_#000] max-h-36 overflow-y-auto text-xs divide-y divide-zinc-200"></div>
+            </div>
+
+            <!-- Customer Block -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Customer Block / Room</label>
+              <input type="text" id="cust-block" placeholder="e.g. Block B - Room 14" required class="w-full bg-white border-2 border-black px-3.5 py-2.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+            </div>
+
+            <!-- Product Selection -->
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1 flex items-center justify-between">
+                <span>Select Item</span>
+                <span id="product-stock-tag" class="font-mono text-[10px] text-zinc-600 font-bold uppercase"></span>
+              </label>
+              <select id="cust-product" onchange="onProductSelectChange()" class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black focus:outline-none focus:bg-zinc-50 font-medium">
+                <!-- Dynamically populated from inventory items -->
+              </select>
+            </div>
+
+            <!-- Quantity & Custom Price -->
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Qty</label>
+                <input type="number" id="cust-qty" min="1" step="1" value="1" oninput="calculateSaleTotal()" required class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black font-mono font-bold focus:outline-none focus:bg-zinc-50" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Price (R)</label>
+                <input type="number" id="cust-price" step="0.01" min="0" value="60" oninput="calculateSaleTotal()" required class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black font-mono font-bold focus:outline-none focus:bg-zinc-50" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Conditional fields: flavour picker (when selling Flavour) / custom item name -->
+          <div id="sale-extra-row" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div id="flavour-pick-wrap" class="hidden">
+              <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Hubbly Flavour (available only)</label>
+              <select id="cust-flavour" class="w-full bg-white border-2 border-black px-3 py-2.5 text-xs text-black focus:outline-none focus:bg-zinc-50 font-medium"></select>
+            </div>
+            <div id="custom-name-wrap" class="hidden">
+              <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Custom Item Name</label>
+              <input type="text" id="cust-custom-name" maxlength="40" placeholder="e.g. Lighter" class="w-full bg-white border-2 border-black px-3.5 py-2.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+            </div>
+          </div>
+
+          <!-- Bottom: Status & Total & Submit -->
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-black">
+            <div class="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-black mb-1">Payment Status</label>
+                <div class="flex gap-2">
+                  <label class="flex items-center gap-1.5 text-xs border border-black px-3 py-1.5 bg-white cursor-pointer font-bold uppercase">
+                    <input type="radio" name="pay-status" value="Paid" checked class="accent-black">
+                    <span>Paid</span>
+                  </label>
+                  <label class="flex items-center gap-1.5 text-xs border border-black px-3 py-1.5 bg-white cursor-pointer font-bold uppercase">
+                    <input type="radio" name="pay-status" value="Owing" class="accent-black">
+                    <span>Owing (Debt)</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Live calculated order total with Loyalty 20% Discount Breakdown -->
+              <div class="border-2 border-black bg-zinc-100 px-4 py-1.5 min-w-[170px] flex flex-col justify-center">
+                <div class="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-600 font-bold">
+                  <span>Charge Total</span>
+                  <span id="cust-discount-tag" class="hidden text-black font-mono font-black border border-black bg-white px-1">20% OFF</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                  <span id="cust-order-total" class="text-base font-black font-mono text-black">R60.00</span>
+                  <span id="cust-original-subtotal" class="text-xs font-mono line-through text-zinc-500 hidden">R0.00</span>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full sm:w-auto py-3 px-6 bg-black text-white font-bold text-xs uppercase tracking-widest hover:bg-zinc-800 transition flex items-center justify-center gap-2 border-2 border-black">
+              <i class="ph-bold ph-plus"></i> Add Customer Sale
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Customer Loyalty Overview & Debtor Ledger -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Loyalty Rewards Directory (1 col) -->
+        <div class="border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000] flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3 pb-2 border-b-2 border-black">
+              <div class="flex items-center gap-2">
+                <i class="ph-bold ph-crown text-base text-black"></i>
+                <h3 class="font-black text-sm uppercase tracking-wider text-black">Loyalty Rewards (4th = -20%)</h3>
+              </div>
+              <span class="text-[10px] font-mono font-bold uppercase border border-black px-1.5 bg-zinc-100">4th Deal</span>
+            </div>
+            <p class="text-[11px] text-zinc-600 mb-3">Automatic 20% discount on every 4th purchase per customer.</p>
+
+            <div id="loyalty-customer-list" class="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-black text-[10px] font-mono text-zinc-500 text-center uppercase">
+            Auto-calculated per customer profile
+          </div>
+        </div>
+
+        <!-- Sales Log & Debtor Breakdown (2 cols) -->
+        <div class="lg:col-span-2 border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+          <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 pb-3 border-b-2 border-black">
+            <div>
+              <h3 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+                <i class="ph-bold ph-users-three"></i> Customer Sales &amp; Debtor Ledger
+              </h3>
+              <p class="text-xs text-zinc-600">Track purchase history, loyalty discounts &amp; payment state.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <!-- Search bar -->
+              <div class="relative flex-1 md:w-56">
+                <i class="ph-bold ph-magnifying-glass absolute left-3 top-2.5 text-black text-xs"></i>
+                <input type="text" id="biz-search-input" oninput="renderBusinessTable()" placeholder="Search name, no. or block..." class="w-full bg-white border border-black pl-8 pr-3 py-1.5 text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+              </div>
+
+              <!-- Status filter -->
+              <select id="biz-status-filter" onchange="renderBusinessTable()" class="bg-white border border-black px-2.5 py-1.5 text-xs text-black font-bold uppercase focus:outline-none focus:bg-zinc-50">
+                <option value="all">All Orders</option>
+                <option value="Paid">Paid</option>
+                <option value="Owing">Owing</option>
+                <option value="Discounted">20% Off Orders</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto max-h-[420px]">
+            <table class="w-full text-left text-xs">
+              <thead class="uppercase bg-zinc-100 text-black border-y-2 border-black font-bold sticky top-0">
+                <tr>
+                  <th class="py-2.5 px-3">Customer &amp; Loyalty</th>
+                  <th class="py-2.5 px-3">Block / Room</th>
+                  <th class="py-2.5 px-3">Product</th>
+                  <th class="py-2.5 px-3">Date</th>
+                  <th class="py-2.5 px-3 text-right">Total Charged</th>
+                  <th class="py-2.5 px-3 text-center">Status</th>
+                  <th class="py-2.5 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="business-table-body" class="divide-y border-b border-black divide-zinc-200">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Monochrome Footer -->
+  <footer class="border-t-2 border-black py-4 mt-12 bg-white text-center text-xs font-mono uppercase text-zinc-600">
+    DualTrack Hub &bull; Plain Black &amp; White Minimalist Edition
+  </footer>
+
+  <!-- Restock Modal Dialog -->
+  <div id="restock-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white border-2 border-black p-6 w-full max-w-md shadow-[6px_6px_0px_0px_#000]">
+      <div class="flex items-center justify-between pb-3 border-b-2 border-black mb-4">
+        <h4 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+          <i class="ph-bold ph-plus-circle text-base"></i> Restock / Add Stock Units
+        </h4>
+        <button onclick="closeRestockModal()" class="text-black hover:bg-black hover:text-white border border-black p-1 transition">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <form id="restock-form" onsubmit="handleRestockSubmit(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-bold uppercase tracking-wider text-black mb-1">Select Item to Restock</label>
+          <select id="restock-item-id" class="w-full bg-white border-2 border-black px-3 py-2 text-xs font-medium focus:outline-none">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold uppercase tracking-wider text-black mb-1">Units to Add (+)</label>
+            <input type="number" id="restock-units-add" min="1" step="1" value="10" required class="w-full bg-white border-2 border-black px-3 py-2 text-xs font-mono font-bold focus:outline-none" />
+          </div>
+          <div>
+            <label class="block font-bold uppercase tracking-wider text-black mb-1">Low Stock Alert At</label>
+            <input type="number" id="restock-min-threshold" min="0" step="1" value="5" required class="w-full bg-white border-2 border-black px-3 py-2 text-xs font-mono font-bold focus:outline-none" />
+          </div>
+        </div>
+
+        <div class="p-2.5 border border-black bg-zinc-50 text-[11px] text-zinc-700">
+          <span class="font-bold uppercase text-black block mb-0.5">Tip:</span>
+          Adding stock updates your available inventory count instantly. The low-stock alert clears once stock is above the alert level.
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeRestockModal()" class="flex-1 py-2.5 uppercase font-bold border-2 border-black bg-white hover:bg-zinc-100 transition">
+            Cancel
+          </button>
+          <button type="submit" class="flex-1 py-2.5 uppercase font-bold border-2 border-black bg-black text-white hover:bg-zinc-800 transition">
+            Save Restock
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Receipt Modal Dialog -->
+  <div id="receipt-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-white border-2 border-black w-full max-w-lg shadow-[6px_6px_0px_0px_#000] my-auto">
+      <!-- Header -->
+      <div class="no-print flex items-center justify-between p-4 border-b-2 border-black">
+        <h4 class="font-black text-sm uppercase tracking-wider text-black flex items-center gap-2">
+          <i class="ph-bold ph-receipt text-base"></i>
+          <span id="receipt-modal-title">Customer Receipt</span>
+        </h4>
+        <button onclick="closeReceiptModal()" class="text-black hover:bg-black hover:text-white border border-black p-1 transition">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="receipt-scroll max-h-[62vh] overflow-y-auto p-4 space-y-4">
+        <div class="no-print space-y-3">
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-black mb-1">Customer WhatsApp Number (optional)</label>
+            <input type="tel" id="rcpt-phone" oninput="onReceiptPhoneChange()" placeholder="e.g. 082 123 4567" class="w-full bg-white border-2 border-black px-3 py-2 text-[16px] sm:text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-mono font-semibold" />
+          </div>
+
+          <details class="border border-black bg-zinc-50">
+            <summary class="cursor-pointer px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-black">Receipt details (business name, contact, note)</summary>
+            <div class="p-3 space-y-3 border-t border-black bg-white">
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-black mb-1">Business Name</label>
+                <input type="text" id="rcpt-business" oninput="onReceiptSettingsChange()" class="w-full bg-white border-2 border-black px-3 py-2 text-[16px] sm:text-xs text-black focus:outline-none focus:bg-zinc-50 font-medium" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-black mb-1">Contact / Payment Details</label>
+                <input type="text" id="rcpt-contact" oninput="onReceiptSettingsChange()" placeholder="e.g. 082 000 0000 | Capitec 0000000000" class="w-full bg-white border-2 border-black px-3 py-2 text-[16px] sm:text-xs text-black placeholder-zinc-400 focus:outline-none focus:bg-zinc-50 font-medium" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-black mb-1">Footer Note</label>
+                <input type="text" id="rcpt-note" oninput="onReceiptSettingsChange()" class="w-full bg-white border-2 border-black px-3 py-2 text-[16px] sm:text-xs text-black focus:outline-none focus:bg-zinc-50 font-medium" />
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- Live receipt preview -->
+        <div id="receipt-preview"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="no-print grid grid-cols-2 gap-2 p-4 border-t-2 border-black">
+        <button onclick="downloadReceiptPDF()" class="col-span-2 py-3 px-3 uppercase text-xs font-bold border-2 border-black bg-black text-white hover:bg-zinc-800 transition flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-file-pdf"></i> Download PDF Slip
+        </button>
+        <button onclick="sendReceiptWhatsApp()" class="py-2.5 px-3 uppercase text-xs font-bold border-2 border-black bg-white text-black hover:bg-black hover:text-white transition flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-whatsapp-logo"></i> WhatsApp
+        </button>
+        <button onclick="shareReceipt()" class="py-2.5 px-3 uppercase text-xs font-bold border-2 border-black bg-white text-black hover:bg-black hover:text-white transition flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-share-network"></i> Share
+        </button>
+        <button onclick="copyReceiptText()" class="py-2.5 px-3 uppercase text-xs font-bold border-2 border-black bg-white text-black hover:bg-black hover:text-white transition flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-copy"></i> Copy Text
+        </button>
+        <button onclick="printReceipt()" class="py-2.5 px-3 uppercase text-xs font-bold border-2 border-black bg-white text-black hover:bg-black hover:text-white transition flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-printer"></i> Print
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Javascript -->
+  <script>
+    // ==========================================
+    // STORAGE KEYS & STATE
+    // ==========================================
+    const FINANCE_STORAGE_KEY = 'dualtrack_finance_data_bw';
+    const BUSINESS_STORAGE_KEY = 'dualtrack_business_data_bw';
+    const INVENTORY_STORAGE_KEY = 'dualtrack_inventory_data_bw';
+    const CUSTOMERS_STORAGE_KEY = 'dualtrack_customers_data_bw';
+    const RECEIPT_SETTINGS_KEY = 'dualtrack_receipt_settings_bw';
+    const RECEIPT_COUNTER_KEY = 'dualtrack_receipt_counter_bw';
+    const FLAVOURS_STORAGE_KEY = 'dualtrack_flavours_data_bw';
+
+    const CUSTOMER_PREFIX = 'AWC';
+    const FLAVOUR_ITEM_NAME = 'Flavour';          // inventory item that needs a flavour picked
+    const LOYALTY_EVERY = 4;                       // every 4th purchase
+    const LOYALTY_PERCENT = 20;                    // gets 20% off
+    const DEFAULT_RECEIPT_SETTINGS = {
+      businessName: 'Hubbly Reseller',
+      contact: '',
+      note: 'Thank you for your support!'
+    };
+    const DEFAULT_FLAVOURS = [
+      'Sheik Money', 'Cinnamon Gum', 'Gum and Mint', 'Lady Killer',
+      'Big Man', 'Blue Mix', 'Mint Cream', 'Frosty Cherry'
+    ];
+
+    // Product groups used by the Best Sellers tracker
+    const GROUP_FLAVOUR = 'Hubbly Flavour';
+    const GROUP_CUBE = 'Coconut (Cube) Charcoal';
+    const GROUP_NASTY = 'Nasty Charcoal';
+    const GROUP_FOIL = 'Foil';
+    const NO_FLAVOUR_LABEL = 'Flavour not recorded';
+
+    let financeEntries = [];
+    let businessSales = [];
+    let inventoryItems = [];
+    let customers = [];
+    let flavours = [];
+    let receiptSettings = Object.assign({}, DEFAULT_RECEIPT_SETTINGS);
+    let receiptCounter = 0;
+    let currentReceipt = null;
+    let currentFinanceFilter = 'all';
+    let currentTopSort = 'qty';
+
+    // ==========================================
+    // HELPERS
+    // ==========================================
+    function localDateStr(d) {
+      d = d || new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
+
+    function round2(n) {
+      return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+    }
+
+    function formatRand(n) {
+      const v = Number(n) || 0;
+      const neg = v < 0;
+      const s = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return (neg ? '-' : '') + 'R' + s;
+    }
+
+    function escapeHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function newId(prefix) {
+      return prefix + '-' + Date.now() + Math.random().toString(36).slice(2, 7);
+    }
+
+    // Label shown for a sale everywhere: "Flavour (Sheik Money)"
+    function itemLabel(s) {
+      return s.flavour ? (s.item + ' (' + s.flavour + ')') : String(s.item || '');
+    }
+
+    function showToast(message, opts) {
+      opts = opts || {};
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto flex items-center gap-3 border-2 border-black bg-black text-white px-4 py-2.5 text-[11px] font-mono font-bold uppercase shadow-[3px_3px_0px_0px_#000] transition-opacity duration-300';
+
+      const span = document.createElement('span');
+      span.textContent = message;
+      toast.appendChild(span);
+
+      if (opts.label && typeof opts.onClick === 'function') {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = opts.label;
+        btn.className = 'border border-white px-2 py-0.5 text-[10px] font-mono font-bold uppercase hover:bg-white hover:text-black transition';
+        btn.onclick = function () {
+          opts.onClick();
+          toast.remove();
+        };
+        toast.appendChild(btn);
+      }
+
+      container.appendChild(toast);
+      setTimeout(function () {
+        toast.style.opacity = '0';
+        setTimeout(function () { toast.remove(); }, 320);
+      }, opts.duration || 3000);
+    }
+
+    function loadJSON(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw === null) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : null;
+      } catch (err) {
+        console.error('Could not read ' + key, err);
+        return null;
+      }
+    }
+
+    function loadObject(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw === null) return fallback;
+        const parsed = JSON.parse(raw);
+        return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : fallback;
+      } catch (err) {
+        return fallback;
+      }
+    }
+
+    function loadNumber(key) {
+      try {
+        return parseInt(localStorage.getItem(key), 10) || 0;
+      } catch (err) {
+        return 0;
+      }
+    }
+
+    function saveJSON(key, value) {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (err) {
+        console.error('Could not save ' + key, err);
+        showToast('Storage error: data not saved');
+      }
+    }
+
+    function downloadJSON(data, filename) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+
+    // ==========================================
+    // INIT
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', function () {
+      initData();
+      setDefaultDates();
+      renderAll();
+      calculateSaleTotal();
+      setupListeners();
+    });
+
+    function setupListeners() {
+      // Autocomplete suggestion click (event delegation)
+      const list = document.getElementById('cust-autocomplete-list');
+      list.addEventListener('click', function (e) {
+        const btn = e.target.closest('.cust-suggest');
+        if (!btn) return;
+        selectCustomerSuggestion(btn.getAttribute('data-name'), btn.getAttribute('data-block'));
+      });
+
+      // Hide autocomplete when clicking elsewhere
+      document.addEventListener('click', function (e) {
+        const nameInput = document.getElementById('cust-name');
+        if (e.target !== nameInput && !list.contains(e.target)) {
+          list.classList.add('hidden');
+        }
+      });
+
+      // Restock modal: backdrop click + threshold prefill
+      const modal = document.getElementById('restock-modal');
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeRestockModal();
+      });
+      document.getElementById('restock-item-id').addEventListener('change', fillRestockThreshold);
+
+      // Receipt modal: backdrop click
+      const rModal = document.getElementById('receipt-modal');
+      rModal.addEventListener('click', function (e) {
+        if (e.target === rModal) closeReceiptModal();
+      });
+
+      // Escape closes any open modal
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          closeRestockModal();
+          closeReceiptModal();
+        }
+      });
+    }
+
+    function switchTab(tab) {
+      const financeSec = document.getElementById('section-finance');
+      const businessSec = document.getElementById('section-business');
+      const financeBtn = document.getElementById('tab-finance-btn');
+      const businessBtn = document.getElementById('tab-business-btn');
+
+      if (tab === 'finance') {
+        financeSec.classList.remove('hidden');
+        businessSec.classList.add('hidden');
+
+        financeBtn.className = 'flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider transition-all bg-black text-white';
+        businessBtn.className = 'flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider transition-all text-black hover:bg-zinc-100';
+      } else {
+        financeSec.classList.add('hidden');
+        businessSec.classList.remove('hidden');
+
+        businessBtn.className = 'flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider transition-all bg-black text-white';
+        financeBtn.className = 'flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold uppercase tracking-wider transition-all text-black hover:bg-zinc-100';
+      }
+    }
+
+    function setDefaultDates() {
+      const today = localDateStr();
+      const incomeDate = document.getElementById('income-date');
+      const expenseDate = document.getElementById('expense-date');
+      if (incomeDate) incomeDate.value = today;
+      if (expenseDate) expenseDate.value = today;
+    }
+
+    function initData() {
+      // Finance & sales start empty on a fresh install (no demo entries that would
+      // inflate your totals). Existing saved data is loaded untouched.
+      const storedFin = loadJSON(FINANCE_STORAGE_KEY);
+      if (storedFin) {
+        financeEntries = storedFin;
+      } else {
+        financeEntries = [];
+        saveFinanceData();
+      }
+
+      const storedBiz = loadJSON(BUSINESS_STORAGE_KEY);
+      if (storedBiz) {
+        businessSales = storedBiz;
+      } else {
+        businessSales = [];
+        saveBusinessData();
+      }
+
+      const storedInv = loadJSON(INVENTORY_STORAGE_KEY);
+      if (storedInv) {
+        inventoryItems = storedInv;
+      } else {
+        inventoryItems = [
+          { id: 'inv-1', name: 'Flavour', stock: 10, unit: 'tins', minThreshold: 3, defaultPrice: 60 },
+          { id: 'inv-2', name: 'Nasty Charcoal Single', stock: 50, unit: 'units', minThreshold: 15, defaultPrice: 3 },
+          { id: 'inv-3', name: 'Nasty Charcoal Pack (10)', stock: 8, unit: 'packs', minThreshold: 3, defaultPrice: 20 },
+          { id: 'inv-4', name: '3 Cube Charcoal', stock: 32, unit: 'sets', minThreshold: 8, defaultPrice: 10 },
+          { id: 'inv-5', name: 'Foil Sheet', stock: 45, unit: 'sheets', minThreshold: 10, defaultPrice: 1 },
+          { id: 'inv-6', name: 'Foil (Heavy)', stock: 25, unit: 'sheets', minThreshold: 8, defaultPrice: 2 }
+        ];
+        saveInventoryData();
+      }
+
+      const storedFl = loadJSON(FLAVOURS_STORAGE_KEY);
+      if (storedFl) {
+        flavours = storedFl;
+      } else {
+        flavours = DEFAULT_FLAVOURS.map(function (n, i) {
+          return { id: 'fl-' + (i + 1), name: n, available: true };
+        });
+        saveFlavours();
+      }
+
+      customers = loadJSON(CUSTOMERS_STORAGE_KEY) || [];
+      receiptSettings = Object.assign({}, DEFAULT_RECEIPT_SETTINGS, loadObject(RECEIPT_SETTINGS_KEY, {}));
+      receiptCounter = loadNumber(RECEIPT_COUNTER_KEY);
+
+      migrateCustomersAndReceipts();
+    }
+
+    function saveFinanceData() { saveJSON(FINANCE_STORAGE_KEY, financeEntries); }
+    function saveBusinessData() { saveJSON(BUSINESS_STORAGE_KEY, businessSales); }
+    function saveInventoryData() { saveJSON(INVENTORY_STORAGE_KEY, inventoryItems); }
+    function saveCustomers() { saveJSON(CUSTOMERS_STORAGE_KEY, customers); }
+    function saveFlavours() { saveJSON(FLAVOURS_STORAGE_KEY, flavours); }
+    function saveReceiptSettings() { saveJSON(RECEIPT_SETTINGS_KEY, receiptSettings); }
+    function saveReceiptCounter() {
+      try { localStorage.setItem(RECEIPT_COUNTER_KEY, String(receiptCounter)); } catch (err) { /* ignore */ }
+    }
+
+    // ==========================================
+    // CUSTOMER NUMBERS & RECEIPT NUMBERS
+    // ==========================================
+    function isCustomerNoFormat(text) {
+      return new RegExp('^' + CUSTOMER_PREFIX + '\\d+$', 'i').test(String(text || '').trim());
+    }
+
+    function nextCustomerNo() {
+      let max = 0;
+      customers.forEach(function (c) {
+        const n = parseInt(String(c.no).replace(/\D/g, ''), 10);
+        if (n > max) max = n;
+      });
+      return CUSTOMER_PREFIX + String(max + 1).padStart(3, '0');
+    }
+
+    function registerCustomer(name, block) {
+      const cust = {
+        id: newId('c'),
+        no: nextCustomerNo(),
+        name: String(name || '').trim(),
+        block: String(block || '').trim(),
+        phone: ''
+      };
+      customers.push(cust);
+      return cust;
+    }
+
+    function nextReceiptNo() {
+      receiptCounter += 1;
+      return 'RCP-' + String(receiptCounter).padStart(4, '0');
+    }
+
+    // Reads the number out of AWC1 / AWC01 / AWC001 (returns null if not that format)
+    function customerNoKey(text) {
+      const m = String(text || '').trim().match(new RegExp('^' + CUSTOMER_PREFIX + '0*(\\d+)$', 'i'));
+      return m ? parseInt(m[1], 10) : null;
+    }
+
+    function padCustomerNo(no) {
+      const k = customerNoKey(no);
+      return k === null ? no : CUSTOMER_PREFIX + String(k).padStart(3, '0');
+    }
+
+    // Find a customer by customer number (AWC001) or by name (case-insensitive)
+    function findCustomer(input) {
+      const raw = String(input || '').trim();
+      if (!raw) return null;
+      const noKey = customerNoKey(raw);
+      if (noKey !== null) {
+        const byNo = customers.find(function (x) { return customerNoKey(x.no) === noKey; });
+        if (byNo) return byNo;
+      }
+      const key = raw.toLowerCase();
+      return customers.find(function (x) { return x.name.toLowerCase() === key; }) || null;
+    }
+
+    // Gives older sales (saved before this feature) a customer number + receipt number
+    function migrateCustomersAndReceipts() {
+      let changed = false;
+
+      // Upgrade older 2-digit numbers (AWC01) to the 3-digit format (AWC001)
+      customers.forEach(function (c) {
+        const p = padCustomerNo(c.no);
+        if (p !== c.no) { c.no = p; changed = true; }
+      });
+      businessSales.forEach(function (sale) {
+        if (sale.customerNo) {
+          const p = padCustomerNo(sale.customerNo);
+          if (p !== sale.customerNo) { sale.customerNo = p; changed = true; }
+        }
+      });
+      for (let i = businessSales.length - 1; i >= 0; i--) {   // oldest first
+        const s = businessSales[i];
+        if (!s.customerNo) {
+          const key = String(s.customer || '').trim().toLowerCase();
+          let c = customers.find(function (x) { return x.name.toLowerCase() === key; });
+          if (!c) c = registerCustomer(s.customer, s.block);
+          s.customerNo = c.no;
+          changed = true;
+        }
+        if (!s.receiptNo) {
+          s.receiptNo = nextReceiptNo();
+          changed = true;
+        }
+      }
+      if (changed) {
+        saveBusinessData();
+        saveCustomers();
+        saveReceiptCounter();
+      }
+    }
+
+    // ==========================================
+    // FINANCE TRACKER
+    // ==========================================
+    function handleFinanceSubmit(e, type) {
+      e.preventDefault();
+
+      const name = document.getElementById(type + '-name').value.trim();
+      const amount = round2(parseFloat(document.getElementById(type + '-amount').value));
+      const category = document.getElementById(type + '-category').value;
+      const date = document.getElementById(type + '-date').value || localDateStr();
+
+      if (!name) {
+        showToast('Enter a name / description');
+        return;
+      }
+      if (!isFinite(amount) || amount <= 0) {
+        showToast('Amount must be greater than R0');
+        return;
+      }
+
+      financeEntries.unshift({
+        id: newId('fin'),
+        type: type,
+        name: name,
+        amount: amount,
+        category: category,
+        date: date
+      });
+
+      saveFinanceData();
+      renderFinanceSection();
+
+      document.getElementById(type + '-form').reset();
+      setDefaultDates();
+
+      showToast((type === 'income' ? 'INCOME RECORDED: ' : 'EXPENSE RECORDED: ') + formatRand(amount));
+    }
+
+    function setFinanceFilter(filter) {
+      currentFinanceFilter = filter;
+      const activeCls = 'px-3 py-1 font-bold uppercase text-[10px] bg-black text-white';
+      const inactiveCls = 'px-3 py-1 font-bold uppercase text-[10px] text-zinc-700 hover:text-black';
+      ['all', 'income', 'expense'].forEach(function (f) {
+        const btn = document.getElementById('fin-filter-' + f);
+        if (btn) btn.className = (f === filter) ? activeCls : inactiveCls;
+      });
+      renderFinanceTable();
+    }
+
+    function deleteFinanceEntry(id) {
+      const index = financeEntries.findIndex(function (f) { return f.id === id; });
+      if (index === -1) return;
+      const removed = financeEntries.splice(index, 1)[0];
+      saveFinanceData();
+      renderFinanceSection();
+      showToast('DELETED: ' + removed.name);
+    }
+
+    function renderFinanceSection() {
+      let totalIncome = 0, totalExpense = 0, incomeCount = 0, expenseCount = 0;
+      const categoryTotals = {};
+
+      financeEntries.forEach(function (f) {
+        const amt = parseFloat(f.amount) || 0;
+        if (f.type === 'income') {
+          totalIncome += amt;
+          incomeCount++;
+        } else {
+          totalExpense += amt;
+          expenseCount++;
+          const cat = f.category || 'Other';
+          categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
+        }
+      });
+
+      totalIncome = round2(totalIncome);
+      totalExpense = round2(totalExpense);
+      const balance = round2(totalIncome - totalExpense);
+      // Savings rate = (income - expenses) / income. Shown as 0% when income is 0 or you overspent.
+      const rawRate = totalIncome > 0 ? Math.round((balance / totalIncome) * 100) : 0;
+      const savingsRate = Math.max(0, Math.min(100, rawRate));
+
+      document.getElementById('fin-total-income').innerText = formatRand(totalIncome);
+      document.getElementById('fin-total-expense').innerText = formatRand(totalExpense);
+      document.getElementById('fin-net-balance').innerText = formatRand(balance);
+      document.getElementById('fin-income-count').innerText = incomeCount + ' recorded ' + (incomeCount === 1 ? 'entry' : 'entries');
+      document.getElementById('fin-expense-count').innerText = expenseCount + ' recorded ' + (expenseCount === 1 ? 'entry' : 'entries');
+      document.getElementById('fin-health-bar').style.width = savingsRate + '%';
+      document.getElementById('fin-savings-rate').innerText = savingsRate + '% saved';
+
+      const tag = document.getElementById('fin-balance-tag');
+      const statusText = document.getElementById('fin-status-text');
+      const statusDesc = document.getElementById('fin-status-desc');
+
+      if (financeEntries.length === 0) {
+        tag.innerText = 'BAL';
+        statusText.innerText = 'No Data';
+        statusDesc.innerText = 'Add income or expenses to get started.';
+      } else if (balance > 0) {
+        tag.innerText = 'SURPLUS';
+        statusText.innerText = 'Surplus';
+        statusDesc.innerText = 'You are ahead by ' + formatRand(balance) + ' (' + savingsRate + '% of income saved).';
+      } else if (balance < 0) {
+        tag.innerText = 'DEFICIT';
+        statusText.innerText = 'Deficit';
+        statusDesc.innerText = 'Spending exceeds income by ' + formatRand(Math.abs(balance)) + '.';
+      } else {
+        tag.innerText = 'EVEN';
+        statusText.innerText = 'Balanced';
+        statusDesc.innerText = 'Income and expenses are equal.';
+      }
+
+      // Category breakdown (top 5)
+      const breakdownEl = document.getElementById('fin-category-breakdown');
+      const cats = Object.keys(categoryTotals)
+        .map(function (k) { return { name: k, total: categoryTotals[k] }; })
+        .sort(function (a, b) { return b.total - a.total; })
+        .slice(0, 5);
+
+      if (cats.length === 0) {
+        breakdownEl.innerHTML = '<div class="text-[11px] text-zinc-500 font-mono">No expenses recorded yet.</div>';
+      } else {
+        breakdownEl.innerHTML = cats.map(function (c) {
+          const pct = totalExpense > 0 ? Math.round((c.total / totalExpense) * 100) : 0;
+          return '<div>' +
+            '<div class="flex justify-between text-[11px] font-bold uppercase mb-0.5">' +
+              '<span>' + escapeHtml(c.name) + '</span>' +
+              '<span class="font-mono">' + formatRand(round2(c.total)) + ' &bull; ' + pct + '%</span>' +
+            '</div>' +
+            '<div class="w-full bg-zinc-200 h-1.5 border border-black overflow-hidden">' +
+              '<div class="bg-black h-full" style="width:' + pct + '%"></div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      }
+
+      renderFinanceTable();
+    }
+
+    function renderFinanceTable() {
+      const tbody = document.getElementById('finance-table-body');
+      if (!tbody) return;
+
+      const rows = financeEntries
+        .filter(function (f) { return currentFinanceFilter === 'all' || f.type === currentFinanceFilter; })
+        .slice()
+        .sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
+
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-zinc-500 text-xs font-mono uppercase">No transactions found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(function (f) {
+        const isIncome = f.type === 'income';
+        return '<tr class="hover:bg-zinc-50 transition">' +
+          '<td class="py-2.5 px-3">' +
+            '<div class="font-bold text-black text-xs uppercase">' + escapeHtml(f.name) + '</div>' +
+            '<div class="text-[10px] font-mono text-zinc-500 uppercase">' + (isIncome ? '[IN] ' : '[OUT] ') + escapeHtml(f.category) + '</div>' +
+          '</td>' +
+          '<td class="py-2.5 px-3 text-xs text-zinc-600 font-mono">' + escapeHtml(f.date || '-') + '</td>' +
+          '<td class="py-2.5 px-3 text-right font-mono font-black text-xs text-black">' + (isIncome ? '+' : '-') + formatRand(f.amount) + '</td>' +
+          '<td class="py-2.5 px-3 text-center">' +
+            '<button onclick="deleteFinanceEntry(\'' + escapeHtml(f.id) + '\')" title="Delete entry" class="text-black hover:bg-black hover:text-white border border-black p-1 transition">' +
+              '<i class="ph-bold ph-trash"></i>' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function exportFinanceData() {
+      if (financeEntries.length === 0) {
+        showToast('No finance entries to back up');
+        return;
+      }
+      downloadJSON(financeEntries, 'FinanceBackup_' + localDateStr() + '.json');
+      showToast('Finance backup downloaded');
+    }
+
+    function clearFinanceData() {
+      if (financeEntries.length === 0) {
+        showToast('Finance ledger already empty');
+        return;
+      }
+      if (!confirm('Delete ALL finance entries? This cannot be undone.')) return;
+      financeEntries = [];
+      saveFinanceData();
+      renderFinanceSection();
+      showToast('All finance entries cleared');
+    }
+
+    // ==========================================
+    // STOCK & INVENTORY CONTROLLER
+    // ==========================================
+    function renderInventoryGrid() {
+      const grid = document.getElementById('stock-cards-grid');
+      const warningBanner = document.getElementById('restock-warning-banner');
+      const warningItems = document.getElementById('restock-warning-items');
+      if (!grid) return;
+
+      const lowStockList = [];
+
+      grid.innerHTML = inventoryItems.map(function (item) {
+        const isLow = item.stock <= item.minThreshold;
+        if (isLow) lowStockList.push(item.name + ' (' + item.stock + ' left)');
+
+        return '' +
+          '<div class="border-2 border-black p-3 bg-white flex flex-col justify-between ' + (isLow ? 'bg-zinc-50' : '') + '">' +
+            '<div>' +
+              '<div class="flex items-center justify-between mb-1">' +
+                '<span class="text-[10px] font-mono font-bold uppercase text-zinc-500">' + escapeHtml(item.unit) + '</span>' +
+                (isLow
+                  ? '<span class="text-[9px] font-mono font-bold uppercase border border-black bg-black text-white px-1">[RESTOCK]</span>'
+                  : '<span class="text-[9px] font-mono text-zinc-500 uppercase">OK</span>') +
+              '</div>' +
+              '<h4 class="font-bold text-xs uppercase text-black line-clamp-1" title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</h4>' +
+              '<div class="mt-2 flex items-baseline gap-1">' +
+                '<span class="text-2xl font-black font-mono text-black">' + item.stock + '</span>' +
+                '<span class="text-[10px] text-zinc-500 font-mono">rem.</span>' +
+              '</div>' +
+              '<div class="text-[10px] font-mono text-zinc-600 mt-0.5">Min threshold: ' + item.minThreshold + '</div>' +
+            '</div>' +
+            '<div class="mt-3 pt-2 border-t border-black flex items-center justify-between gap-1">' +
+              '<button onclick="adjustStockDirectly(\'' + escapeHtml(item.id) + '\', -1)" title="Minus 1 (Loss/Breakage)" class="flex-1 py-1 text-center font-mono font-bold border border-black bg-white hover:bg-black hover:text-white transition text-xs">-1</button>' +
+              '<button onclick="adjustStockDirectly(\'' + escapeHtml(item.id) + '\', 1)" title="Add 1 unit" class="flex-1 py-1 text-center font-mono font-bold border border-black bg-white hover:bg-black hover:text-white transition text-xs">+1</button>' +
+            '</div>' +
+          '</div>';
+      }).join('');
+
+      if (lowStockList.length > 0) {
+        warningBanner.classList.remove('hidden');
+        warningItems.innerText = lowStockList.join(' • ');
+      } else {
+        warningBanner.classList.add('hidden');
+      }
+
+      populateProductSelectDropdown();
+    }
+
+    function populateProductSelectDropdown() {
+      const select = document.getElementById('cust-product');
+      const restockSelect = document.getElementById('restock-item-id');
+      if (!select) return;
+
+      const currentVal = select.value;
+
+      select.innerHTML = inventoryItems.map(function (item) {
+        return '<option value="' + escapeHtml(item.name) + '" data-id="' + escapeHtml(item.id) + '" data-price="' + item.defaultPrice + '" data-stock="' + item.stock + '" data-min="' + item.minThreshold + '">' +
+          escapeHtml(item.name) + ' (R' + item.defaultPrice + ') &bull; [' + item.stock + ' in stock]' +
+        '</option>';
+      }).join('') + '<option value="Custom" data-price="0" data-stock="999" data-min="0">Custom Item / Other</option>';
+
+      if (currentVal) {
+        select.value = currentVal;
+        if (select.value !== currentVal) select.selectedIndex = 0;
+      }
+
+      if (restockSelect) {
+        const prevRestock = restockSelect.value;
+        restockSelect.innerHTML = inventoryItems.map(function (item) {
+          return '<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.name) + ' (Current: ' + item.stock + ' ' + escapeHtml(item.unit) + ')</option>';
+        }).join('');
+        if (prevRestock) restockSelect.value = prevRestock;
+      }
+
+      updateProductStockHint();
+      updateSaleExtraFields();
+    }
+
+    function updateProductStockHint() {
+      const select = document.getElementById('cust-product');
+      const tag = document.getElementById('product-stock-tag');
+      if (!select || !tag) return;
+
+      const selectedOption = select.options[select.selectedIndex];
+      if (!selectedOption) return;
+
+      const stock = parseInt(selectedOption.getAttribute('data-stock') || '0', 10);
+      const minT = parseInt(selectedOption.getAttribute('data-min') || '0', 10);
+      if (select.value === 'Custom') {
+        tag.innerText = '';
+        return;
+      }
+
+      tag.innerText = 'STOCK: ' + stock + ' LEFT';
+      if (stock <= minT) {
+        tag.className = 'font-mono text-[10px] font-black uppercase text-black underline';
+      } else {
+        tag.className = 'font-mono text-[10px] font-bold uppercase text-zinc-600';
+      }
+    }
+
+    // Shows the flavour picker (when selling Flavour) or custom-name box (when Custom)
+    function updateSaleExtraFields() {
+      const select = document.getElementById('cust-product');
+      const row = document.getElementById('sale-extra-row');
+      const flavWrap = document.getElementById('flavour-pick-wrap');
+      const customWrap = document.getElementById('custom-name-wrap');
+      if (!select || !row) return;
+
+      const val = String(select.value || '');
+      const needsFlavour = val.toLowerCase() === FLAVOUR_ITEM_NAME.toLowerCase();
+      const needsCustom = val === 'Custom';
+
+      flavWrap.classList.toggle('hidden', !needsFlavour);
+      customWrap.classList.toggle('hidden', !needsCustom);
+      row.classList.toggle('hidden', !(needsFlavour || needsCustom));
+    }
+
+    function adjustStockDirectly(itemId, delta) {
+      const item = inventoryItems.find(function (i) { return i.id === itemId; });
+      if (!item) return;
+
+      item.stock = Math.max(0, (item.stock || 0) + delta);
+      saveInventoryData();
+      renderInventoryGrid();
+      showToast(item.name.toUpperCase() + ': ' + item.stock + ' ' + item.unit + ' REMAINING');
+    }
+
+    function fillRestockThreshold() {
+      const id = document.getElementById('restock-item-id').value;
+      const item = inventoryItems.find(function (i) { return i.id === id; });
+      if (item) document.getElementById('restock-min-threshold').value = item.minThreshold;
+    }
+
+    function openRestockModal() {
+      populateProductSelectDropdown();
+      fillRestockThreshold();
+      document.getElementById('restock-modal').classList.remove('hidden');
+    }
+
+    function closeRestockModal() {
+      const modal = document.getElementById('restock-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function handleRestockSubmit(e) {
+      e.preventDefault();
+      const itemId = document.getElementById('restock-item-id').value;
+      const addUnits = parseInt(document.getElementById('restock-units-add').value, 10);
+      const minRaw = parseInt(document.getElementById('restock-min-threshold').value, 10);
+      const minThreshold = isNaN(minRaw) || minRaw < 0 ? 0 : minRaw;
+
+      const item = inventoryItems.find(function (i) { return i.id === itemId; });
+      if (!item) return;
+      if (isNaN(addUnits) || addUnits < 1) {
+        showToast('Units to add must be at least 1');
+        return;
+      }
+
+      item.stock += addUnits;
+      item.minThreshold = minThreshold;
+      saveInventoryData();
+      renderInventoryGrid();
+      closeRestockModal();
+      showToast('RESTOCKED: +' + addUnits + ' ' + item.name.toUpperCase() + ' (NOW ' + item.stock + ')');
+    }
+
+    // Removes stock for a sale and returns how many units were REALLY removed
+    // (never goes below 0), so deleting the sale later restores the exact amount.
+    function deductStockForSale(itemName, qty) {
+      const item = inventoryItems.find(function (i) { return i.name.toLowerCase() === String(itemName || '').toLowerCase(); });
+      if (!item) return 0;
+      const actual = Math.min(Math.max(0, item.stock), qty);
+      item.stock -= actual;
+      saveInventoryData();
+      return actual;
+    }
+
+    // ==========================================
+    // HUBBLY FLAVOURS
+    // ==========================================
+    function renderFlavours() {
+      const grid = document.getElementById('flavour-grid');
+      const badge = document.getElementById('flavour-count-badge');
+      if (!grid) return;
+
+      const availCount = flavours.filter(function (f) { return f.available; }).length;
+      badge.innerText = availCount + ' of ' + flavours.length + ' available';
+
+      if (flavours.length === 0) {
+        grid.innerHTML = '<div class="sm:col-span-2 text-[11px] text-zinc-500 font-mono uppercase">No flavours yet. Add one below.</div>';
+      } else {
+        grid.innerHTML = flavours.map(function (f) {
+          const on = !!f.available;
+          return '' +
+            '<div class="border-2 border-black ' + (on ? 'bg-white' : 'bg-zinc-100') + ' p-2.5 flex items-center justify-between gap-2">' +
+              '<div class="min-w-0">' +
+                '<div class="font-black text-xs uppercase text-black truncate ' + (on ? '' : 'line-through text-zinc-500') + '" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
+                '<div class="text-[9px] font-mono font-bold uppercase ' + (on ? 'text-black' : 'text-zinc-500') + '">' + (on ? 'Available' : 'Sold out') + '</div>' +
+              '</div>' +
+              '<div class="flex items-center gap-1 shrink-0">' +
+                '<button onclick="toggleFlavour(\'' + escapeHtml(f.id) + '\')" title="Mark as ' + (on ? 'sold out' : 'available') + '" class="px-2 py-1 text-[10px] font-mono font-bold uppercase border border-black transition ' + (on ? 'bg-black text-white hover:bg-white hover:text-black' : 'bg-white text-black hover:bg-black hover:text-white') + '">' + (on ? 'On' : 'Off') + '</button>' +
+                '<button onclick="deleteFlavour(\'' + escapeHtml(f.id) + '\')" title="Remove flavour (sales history is kept)" class="text-black hover:bg-black hover:text-white border border-black p-1 transition">' +
+                  '<i class="ph-bold ph-x"></i>' +
+                '</button>' +
+              '</div>' +
+            '</div>';
+        }).join('');
+      }
+
+      populateFlavourSelect();
+    }
+
+    function populateFlavourSelect() {
+      const sel = document.getElementById('cust-flavour');
+      if (!sel) return;
+      const prev = sel.value;
+      const avail = flavours.filter(function (f) { return f.available; });
+
+      if (avail.length === 0) {
+        sel.innerHTML = '<option value="">No flavours available</option>';
+        return;
+      }
+      sel.innerHTML = avail.map(function (f) {
+        return '<option value="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</option>';
+      }).join('');
+      if (prev && avail.some(function (f) { return f.name === prev; })) sel.value = prev;
+    }
+
+    function toggleFlavour(id) {
+      const f = flavours.find(function (x) { return x.id === id; });
+      if (!f) return;
+      f.available = !f.available;
+      saveFlavours();
+      renderFlavours();
+      showToast(f.name.toUpperCase() + ': ' + (f.available ? 'AVAILABLE' : 'SOLD OUT'));
+    }
+
+    function handleAddFlavour(e) {
+      e.preventDefault();
+      const input = document.getElementById('new-flavour-name');
+      const name = input.value.trim().replace(/\s+/g, ' ');
+      if (!name) {
+        showToast('Enter a flavour name');
+        return;
+      }
+      const exists = flavours.some(function (f) { return f.name.toLowerCase() === name.toLowerCase(); });
+      if (exists) {
+        showToast('That flavour is already in the list');
+        return;
+      }
+      flavours.push({ id: newId('fl'), name: name, available: true });
+      saveFlavours();
+      input.value = '';
+      renderFlavours();
+      renderTopSellers();
+      showToast('FLAVOUR ADDED: ' + name.toUpperCase());
+    }
+
+    function deleteFlavour(id) {
+      const f = flavours.find(function (x) { return x.id === id; });
+      if (!f) return;
+      if (!confirm('Remove "' + f.name + '" from the flavour list? Past sales of this flavour are kept.')) return;
+      flavours = flavours.filter(function (x) { return x.id !== id; });
+      saveFlavours();
+      renderFlavours();
+      renderTopSellers();
+      showToast('FLAVOUR REMOVED: ' + f.name.toUpperCase());
+    }
+
+    // ==========================================
+    // BEST SELLERS
+    // ==========================================
+    function groupOf(sale) {
+      const n = String(sale.item || '').toLowerCase();
+      if (sale.flavour || n.indexOf('flavour') !== -1) return GROUP_FLAVOUR;
+      if (n.indexOf('cube') !== -1 || n.indexOf('coconut') !== -1) return GROUP_CUBE;
+      if (n.indexOf('charcoal') !== -1) return GROUP_NASTY;
+      if (n.indexOf('foil') !== -1) return GROUP_FOIL;
+      return String(sale.item || 'Other');
+    }
+
+    function blankStat(name) {
+      return { name: name, qty: 0, orders: 0, revenue: 0 };
+    }
+
+    function addToStat(stat, sale) {
+      stat.qty += parseInt(sale.qty, 10) || 0;
+      stat.orders += 1;
+      stat.revenue += parseFloat(sale.total) || 0;
+    }
+
+    function setTopSort(key) {
+      currentTopSort = key;
+      const activeCls = 'px-3 py-1 font-bold uppercase text-[10px] bg-black text-white';
+      const inactiveCls = 'px-3 py-1 font-bold uppercase text-[10px] text-zinc-700 hover:text-black';
+      ['qty', 'orders', 'revenue'].forEach(function (k) {
+        const btn = document.getElementById('top-sort-' + k);
+        if (btn) btn.className = (k === key) ? activeCls : inactiveCls;
+      });
+      renderTopSellers();
+    }
+
+    function statValue(stat) {
+      return stat[currentTopSort] || 0;
+    }
+
+    function rankRowsHtml(stats, emptyMsg) {
+      const max = stats.reduce(function (m, s) { return Math.max(m, statValue(s)); }, 0);
+      if (stats.length === 0) {
+        return '<div class="text-[11px] text-zinc-500 font-mono">' + emptyMsg + '</div>';
+      }
+      return stats.map(function (s, i) {
+        const v = statValue(s);
+        const pct = max > 0 ? Math.round((v / max) * 100) : 0;
+        const dim = s.orders === 0 ? ' text-zinc-400' : '';
+        return '<div>' +
+          '<div class="flex justify-between gap-2 text-[11px] font-bold uppercase mb-0.5' + dim + '">' +
+            '<span class="truncate"><span class="font-mono">' + (i + 1) + '.</span> ' + escapeHtml(s.name) + '</span>' +
+            '<span class="font-mono whitespace-nowrap">' + s.qty + ' sold &bull; ' + s.orders + ' order' + (s.orders === 1 ? '' : 's') + ' &bull; ' + formatRand(round2(s.revenue)) + '</span>' +
+          '</div>' +
+          '<div class="w-full bg-zinc-200 h-1.5 border border-black overflow-hidden">' +
+            '<div class="bg-black h-full" style="width:' + pct + '%"></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function sortStats(arr) {
+      return arr.slice().sort(function (a, b) {
+        const d = statValue(b) - statValue(a);
+        if (d !== 0) return d;
+        if (b.orders !== a.orders) return b.orders - a.orders;
+        return a.name.localeCompare(b.name);
+      });
+    }
+
+    function renderTopSellers() {
+      const groupsEl = document.getElementById('top-groups-list');
+      const flavEl = document.getElementById('top-flavours-list');
+      const headEl = document.getElementById('top-seller-headline');
+      if (!groupsEl || !flavEl || !headEl) return;
+
+      const groups = {};
+      [GROUP_CUBE, GROUP_NASTY, GROUP_FOIL, GROUP_FLAVOUR].forEach(function (n) { groups[n] = blankStat(n); });
+
+      const flav = {};
+      flavours.forEach(function (f) { flav[f.name] = blankStat(f.name); });
+
+      businessSales.forEach(function (sale) {
+        const g = groupOf(sale);
+        if (!groups[g]) groups[g] = blankStat(g);
+        addToStat(groups[g], sale);
+
+        if (g === GROUP_FLAVOUR) {
+          const fname = sale.flavour || NO_FLAVOUR_LABEL;
+          if (!flav[fname]) flav[fname] = blankStat(fname);
+          addToStat(flav[fname], sale);
+        }
+      });
+
+      // "Flavour not recorded" only appears when old sales exist without a flavour
+      if (flav[NO_FLAVOUR_LABEL] && flav[NO_FLAVOUR_LABEL].orders === 0) delete flav[NO_FLAVOUR_LABEL];
+
+      const groupArr = sortStats(Object.keys(groups).map(function (k) { return groups[k]; }));
+      const flavArr = sortStats(Object.keys(flav).map(function (k) { return flav[k]; }));
+
+      const metricWord = { qty: 'units sold', orders: 'orders', revenue: 'in sales' }[currentTopSort];
+      const topGroup = groupArr[0];
+      const topFlav = flavArr.filter(function (f) { return f.name !== NO_FLAVOUR_LABEL; })[0];
+
+      if (!topGroup || statValue(topGroup) <= 0) {
+        headEl.innerHTML = 'No orders yet. Best sellers show up here once you record sales.';
+      } else {
+        const val = currentTopSort === 'revenue' ? formatRand(round2(topGroup.revenue)) : statValue(topGroup);
+        let line = 'Most bought: ' + escapeHtml(topGroup.name) + ' (' + val + ' ' + metricWord + ')';
+        if (topFlav && statValue(topFlav) > 0) {
+          const fval = currentTopSort === 'revenue' ? formatRand(round2(topFlav.revenue)) : statValue(topFlav);
+          line += '<br>Top flavour: ' + escapeHtml(topFlav.name) + ' (' + fval + ' ' + metricWord + ')';
+        }
+        headEl.innerHTML = line;
+      }
+
+      groupsEl.innerHTML = rankRowsHtml(groupArr, 'No sales yet.');
+      flavEl.innerHTML = rankRowsHtml(flavArr, 'No flavours in the list yet.');
+    }
+
+    // ==========================================
+    // CUSTOMER / LOYALTY LOGIC
+    // ==========================================
+    // Order numbers keep counting up even if an old order is deleted, so the
+    // "every 4th purchase" cycle never shifts or repeats a number.
+    function getCustomerPurchaseHistory(input) {
+      const cust = findCustomer(input);
+      if (!cust) {
+        return { customer: null, orderCount: 0, nextOrderNumber: 1, isFourthOrder: false };
+      }
+      const mine = businessSales.filter(function (s) { return s.customerNo === cust.no; });
+      const maxSeq = mine.reduce(function (m, s) { return Math.max(m, parseInt(s.orderSequence, 10) || 0); }, 0);
+      const orderCount = mine.length;
+      const nextOrderNumber = Math.max(orderCount, maxSeq) + 1;
+      return {
+        customer: cust,
+        orderCount: orderCount,
+        nextOrderNumber: nextOrderNumber,
+        isFourthOrder: nextOrderNumber % LOYALTY_EVERY === 0
+      };
+    }
+
+    function onCustomerNameInput() {
+      const input = document.getElementById('cust-name');
+      const name = input.value.trim();
+      const key = name.toLowerCase();
+      const hint = document.getElementById('cust-order-count-hint');
+      const badge = document.getElementById('loyalty-indicator-badge');
+      const list = document.getElementById('cust-autocomplete-list');
+
+      const history = getCustomerPurchaseHistory(name);
+      const cust = history.customer;
+
+      if (!name) {
+        hint.innerText = '';
+      } else if (cust) {
+        hint.innerText = cust.no + ' · ' + history.orderCount + ' order' + (history.orderCount === 1 ? '' : 's');
+        // Customer number typed directly: show the name and prefill the block
+        if (customerNoKey(name) !== null) {
+          hint.innerText = cust.no + ' · ' + cust.name;
+          const blockEl = document.getElementById('cust-block');
+          if (blockEl && !blockEl.value.trim() && cust.block) blockEl.value = cust.block;
+        }
+      } else if (isCustomerNoFormat(name)) {
+        hint.innerText = 'NO. NOT FOUND';
+      } else {
+        hint.innerText = 'NEW · ' + nextCustomerNo();
+      }
+
+      if (history.isFourthOrder) {
+        badge.innerText = '4th order: ' + LOYALTY_PERCENT + '% off';
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+
+      // Suggestions from the customer registry (name or customer number)
+      if (!key) {
+        list.classList.add('hidden');
+      } else {
+        const matches = customers.filter(function (c) {
+          const n = c.name.toLowerCase();
+          const no = c.no.toLowerCase();
+          return (n.indexOf(key) !== -1 || no.indexOf(key) !== -1) && n !== key && no !== key;
+        }).slice().reverse().slice(0, 6);
+
+        if (matches.length === 0) {
+          list.classList.add('hidden');
+        } else {
+          list.innerHTML = matches.map(function (m) {
+            return '<button type="button" class="cust-suggest block w-full text-left px-3 py-2 hover:bg-black hover:text-white transition" data-name="' + escapeHtml(m.name) + '" data-block="' + escapeHtml(m.block) + '">' +
+              '<span class="font-bold uppercase">' + escapeHtml(m.name) + '</span>' +
+              '<span class="font-mono text-[10px] font-bold ml-2">' + escapeHtml(m.no) + '</span>' +
+              '<span class="font-mono text-[10px] opacity-70 ml-2">' + escapeHtml(m.block) + '</span>' +
+            '</button>';
+          }).join('');
+          list.classList.remove('hidden');
+        }
+      }
+
+      calculateSaleTotal();
+    }
+
+    function selectCustomerSuggestion(name, block) {
+      document.getElementById('cust-name').value = name;
+      if (block) {
+        document.getElementById('cust-block').value = block;
+      }
+      document.getElementById('cust-autocomplete-list').classList.add('hidden');
+      onCustomerNameInput();
+    }
+
+    function onProductSelectChange() {
+      const select = document.getElementById('cust-product');
+      const selectedOption = select.options[select.selectedIndex];
+      if (!selectedOption) return;
+      const defaultPrice = parseFloat(selectedOption.getAttribute('data-price') || '0');
+      const priceInput = document.getElementById('cust-price');
+
+      if (select.value !== 'Custom') {
+        priceInput.value = defaultPrice;
+      }
+      updateProductStockHint();
+      updateSaleExtraFields();
+      calculateSaleTotal();
+    }
+
+    function calculateSaleTotal() {
+      const qty = parseInt(document.getElementById('cust-qty').value, 10) || 0;
+      const unitPrice = parseFloat(document.getElementById('cust-price').value) || 0;
+      const subtotal = round2(Math.max(0, qty) * Math.max(0, unitPrice));
+
+      const custName = document.getElementById('cust-name').value.trim();
+      const loyalty = getCustomerPurchaseHistory(custName);
+
+      const discountTag = document.getElementById('cust-discount-tag');
+      const originalSubtotalEl = document.getElementById('cust-original-subtotal');
+      const orderTotalEl = document.getElementById('cust-order-total');
+
+      let finalTotal = subtotal;
+      let discountAmount = 0;
+
+      if (loyalty.isFourthOrder && subtotal > 0) {
+        discountAmount = round2(subtotal * LOYALTY_PERCENT / 100);
+        finalTotal = round2(subtotal - discountAmount);
+
+        discountTag.classList.remove('hidden');
+        originalSubtotalEl.classList.remove('hidden');
+        originalSubtotalEl.innerText = formatRand(subtotal);
+      } else {
+        discountTag.classList.add('hidden');
+        originalSubtotalEl.classList.add('hidden');
+      }
+
+      orderTotalEl.innerText = formatRand(finalTotal);
+
+      return {
+        subtotal: subtotal,
+        discountAmount: discountAmount,
+        discountPercent: (loyalty.isFourthOrder && subtotal > 0) ? LOYALTY_PERCENT : 0,
+        finalTotal: finalTotal,
+        orderSequence: loyalty.nextOrderNumber
+      };
+    }
+
+    // ==========================================
+    // SALES
+    // ==========================================
+    function handleSaleSubmit(e) {
+      e.preventDefault();
+
+      const typedName = document.getElementById('cust-name').value.trim();
+      const block = document.getElementById('cust-block').value.trim();
+      const selectedItem = document.getElementById('cust-product').value;
+      const qty = parseInt(document.getElementById('cust-qty').value, 10) || 0;
+      const unitPrice = parseFloat(document.getElementById('cust-price').value);
+
+      if (!typedName || !block) {
+        showToast('Provide Customer Name and Block');
+        return;
+      }
+      if (qty < 1) {
+        showToast('Quantity must be at least 1');
+        return;
+      }
+      if (!isFinite(unitPrice) || unitPrice < 0) {
+        showToast('Enter a valid price');
+        return;
+      }
+
+      // A customer number that does not exist must not become a customer called "AWC09"
+      let cust = findCustomer(typedName);
+      if (!cust && isCustomerNoFormat(typedName)) {
+        showToast('Customer ' + typedName.toUpperCase() + ' not found. Type a name for a new customer');
+        return;
+      }
+      const customerName = cust ? cust.name : typedName;
+
+      // Item, flavour and custom-item handling
+      let item = selectedItem;
+      let flavour = '';
+      let isCustom = false;
+
+      if (selectedItem === 'Custom') {
+        const customName = document.getElementById('cust-custom-name').value.trim();
+        if (!customName) {
+          showToast('Enter a name for the custom item');
+          return;
+        }
+        item = customName;
+        isCustom = true;
+      } else if (selectedItem.toLowerCase() === FLAVOUR_ITEM_NAME.toLowerCase()) {
+        flavour = document.getElementById('cust-flavour').value;
+        const stillAvailable = flavours.some(function (f) { return f.available && f.name === flavour; });
+        if (!flavour || !stillAvailable) {
+          showToast('Pick an available flavour first');
+          return;
+        }
+      }
+
+      const calc = calculateSaleTotal();
+
+      if (calc.finalTotal <= 0) {
+        showToast('Order total must be > R0');
+        return;
+      }
+
+      const statusEl = document.querySelector('input[name="pay-status"]:checked');
+      const status = statusEl ? statusEl.value : 'Paid';
+
+      // Stock check before deducting
+      const matchedStockItem = isCustom ? null : inventoryItems.find(function (i) { return i.name.toLowerCase() === item.toLowerCase(); });
+      if (matchedStockItem && matchedStockItem.stock < qty) {
+        const proceed = confirm('Warning: Only ' + matchedStockItem.stock + ' ' + matchedStockItem.name + ' left in stock (selling ' + qty + '). Continue and deduct remaining stock?');
+        if (!proceed) return;
+      }
+
+      // Register new customer (gets the next AWC number) or update block of existing one
+      let isNewCustomer = false;
+      if (!cust) {
+        cust = registerCustomer(customerName, block);
+        isNewCustomer = true;
+      } else {
+        cust.block = block;
+      }
+      saveCustomers();
+
+      const receiptNo = nextReceiptNo();
+      saveReceiptCounter();
+
+      const deducted = isCustom ? 0 : deductStockForSale(item, qty);
+
+      const newSale = {
+        id: newId('biz'),
+        customer: customerName,
+        customerNo: cust.no,
+        receiptNo: receiptNo,
+        block: block,
+        item: item,
+        flavour: flavour,
+        isCustom: isCustom,
+        qty: qty,
+        unitPrice: unitPrice,
+        subtotal: calc.subtotal,
+        discountPercent: calc.discountPercent,
+        total: calc.finalTotal,
+        orderSequence: calc.orderSequence,
+        stockDeducted: deducted,
+        status: status,
+        date: localDateStr()
+      };
+
+      businessSales.unshift(newSale);
+      saveBusinessData();
+
+      // Reset form
+      document.getElementById('cust-name').value = '';
+      document.getElementById('cust-block').value = '';
+      document.getElementById('cust-qty').value = '1';
+      document.getElementById('cust-custom-name').value = '';
+      document.getElementById('cust-autocomplete-list').classList.add('hidden');
+      document.getElementById('cust-order-count-hint').innerText = '';
+      document.getElementById('loyalty-indicator-badge').classList.add('hidden');
+
+      renderBusinessSection();
+      onProductSelectChange();
+
+      const receiptAction = {
+        label: 'RECEIPT',
+        duration: 8000,
+        onClick: function () { openSaleReceipt(newSale.id); }
+      };
+
+      if (calc.discountPercent > 0) {
+        showToast('4TH ORDER ' + LOYALTY_PERCENT + '% OFF APPLIED! ' + customerName.toUpperCase() + ' (' + cust.no + ') CHARGED: ' + formatRand(calc.finalTotal), receiptAction);
+      } else if (isNewCustomer) {
+        showToast('NEW CUSTOMER ' + cust.no + ': ' + customerName.toUpperCase() + ' [STOCK -' + deducted + ']', receiptAction);
+      } else {
+        showToast('SALE RECORDED: ' + customerName.toUpperCase() + ' (' + cust.no + ') [STOCK -' + deducted + ']', receiptAction);
+      }
+    }
+
+    function toggleSaleStatus(id) {
+      const sale = businessSales.find(function (s) { return s.id === id; });
+      if (sale) {
+        sale.status = sale.status === 'Paid' ? 'Owing' : 'Paid';
+        saveBusinessData();
+        renderBusinessSection();
+        showToast(sale.customer.toUpperCase() + ': ' + sale.status.toUpperCase());
+      }
+    }
+
+    function deleteSaleEntry(id) {
+      const index = businessSales.findIndex(function (s) { return s.id === id; });
+      if (index === -1) return;
+      const removed = businessSales.splice(index, 1)[0];
+
+      // Return exactly the units that were taken from stock (older records fall back to qty)
+      let restored = 0;
+      if (!removed.isCustom) {
+        const stockItem = inventoryItems.find(function (i) { return i.name.toLowerCase() === String(removed.item || '').toLowerCase(); });
+        if (stockItem) {
+          restored = typeof removed.stockDeducted === 'number' ? removed.stockDeducted : (parseInt(removed.qty, 10) || 0);
+          stockItem.stock += restored;
+          saveInventoryData();
+        }
+      }
+
+      saveBusinessData();
+      renderBusinessSection();
+      onCustomerNameInput();
+      showToast('DELETED ORDER: ' + removed.customer.toUpperCase() + (restored > 0 ? ' (STOCK +' + restored + ')' : ''));
+    }
+
+    function renderLoyaltySummary() {
+      const listEl = document.getElementById('loyalty-customer-list');
+      if (!listEl) return;
+
+      const customerMap = {};
+      businessSales.forEach(function (s) {
+        const no = s.customerNo;
+        if (!no) return;
+        if (!customerMap[no]) {
+          const reg = customers.find(function (c) { return c.no === no; });
+          customerMap[no] = {
+            no: no,
+            displayName: reg ? reg.name : s.customer,
+            ordersCount: 0,
+            maxSeq: 0,
+            totalSpent: 0,
+            discountsEarned: 0,
+            due: 0
+          };
+        }
+        const amt = parseFloat(s.total) || 0;
+        customerMap[no].ordersCount += 1;
+        customerMap[no].maxSeq = Math.max(customerMap[no].maxSeq, parseInt(s.orderSequence, 10) || 0);
+        customerMap[no].totalSpent += amt;
+        if (s.discountPercent > 0) customerMap[no].discountsEarned += 1;
+        if (s.status !== 'Paid') customerMap[no].due += amt;
+      });
+
+      const customerArray = Object.keys(customerMap)
+        .map(function (k) { return customerMap[k]; })
+        .sort(function (a, b) { return b.ordersCount - a.ordersCount; });
+
+      if (customerArray.length === 0) {
+        listEl.innerHTML = '<div class="text-[11px] text-zinc-500 font-mono">No customer orders recorded yet.</div>';
+        return;
+      }
+
+      listEl.innerHTML = customerArray.map(function (c) {
+        const seq = Math.max(c.ordersCount, c.maxSeq);
+        const ordersTillNext = LOYALTY_EVERY - (seq % LOYALTY_EVERY);
+        const nextOrderDiscount = (seq + 1) % LOYALTY_EVERY === 0;
+
+        return '' +
+          '<div class="border border-black p-2.5 bg-zinc-50">' +
+            '<div class="flex justify-between items-start gap-2">' +
+              '<div>' +
+                '<div class="flex items-center gap-1.5">' +
+                  '<span class="font-black text-black uppercase text-xs">' + escapeHtml(c.displayName) + '</span>' +
+                  '<span class="text-[9px] font-mono font-black border border-black bg-white px-1">' + escapeHtml(c.no) + '</span>' +
+                '</div>' +
+                '<div class="text-[10px] text-zinc-600 font-mono mt-0.5">' + c.ordersCount + ' purchase' + (c.ordersCount === 1 ? '' : 's') + ' &bull; ' + formatRand(round2(c.totalSpent)) + ' spent</div>' +
+                (c.due > 0 ? '<div class="text-[10px] font-mono font-bold text-black underline mt-0.5">OWES ' + formatRand(round2(c.due)) + '</div>' : '') +
+              '</div>' +
+              (nextOrderDiscount
+                ? '<span class="text-[9px] font-mono font-bold uppercase border-2 border-black bg-black text-white px-1.5 py-0.5 whitespace-nowrap">NEXT IS ' + LOYALTY_PERCENT + '% OFF!</span>'
+                : '<span class="text-[9px] font-mono uppercase border border-black bg-white px-1 text-zinc-700 whitespace-nowrap">' + ordersTillNext + ' to ' + LOYALTY_PERCENT + '% off</span>') +
+            '</div>' +
+            (c.discountsEarned > 0
+              ? '<div class="mt-1.5 text-[9px] font-mono font-bold uppercase text-black flex items-center gap-1"><i class="ph-bold ph-check"></i> ' + c.discountsEarned + ' loyalty discount' + (c.discountsEarned > 1 ? 's' : '') + ' redeemed</div>'
+              : '') +
+            '<button onclick="openCustomerStatement(\'' + escapeHtml(c.no) + '\')" class="mt-2 w-full py-1 text-[10px] font-mono font-bold uppercase border border-black bg-white hover:bg-black hover:text-white transition flex items-center justify-center gap-1">' +
+              '<i class="ph-bold ph-file-text"></i> Account Statement' +
+            '</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    function renderBusinessSection() {
+      let paidTotal = 0;
+      let owingTotal = 0;
+      let itemsSold = 0;
+      const owingCustomers = {};
+
+      businessSales.forEach(function (sale) {
+        const saleAmt = parseFloat(sale.total) || 0;
+        itemsSold += parseInt(sale.qty, 10) || 0;
+
+        if (sale.status === 'Paid') {
+          paidTotal += saleAmt;
+        } else {
+          owingTotal += saleAmt;
+          owingCustomers[String(sale.customerNo || sale.customer || '').toLowerCase()] = true;
+        }
+      });
+
+      paidTotal = round2(paidTotal);
+      owingTotal = round2(owingTotal);
+      const grossSales = round2(paidTotal + owingTotal);
+      const debtorCount = Object.keys(owingCustomers).length;
+
+      document.getElementById('biz-total-paid').innerText = formatRand(paidTotal);
+      document.getElementById('biz-total-debt').innerText = formatRand(owingTotal);
+      document.getElementById('biz-gross-sales').innerText = formatRand(grossSales);
+      document.getElementById('biz-items-sold').innerText = itemsSold.toLocaleString('en-US');
+      document.getElementById('biz-debtor-count').innerText = debtorCount + (debtorCount === 1 ? ' customer owing' : ' customers owing');
+
+      renderFlavours();
+      renderInventoryGrid();
+      renderTopSellers();
+      renderLoyaltySummary();
+      renderBusinessTable();
+    }
+
+    function renderBusinessTable() {
+      const tbody = document.getElementById('business-table-body');
+      const searchQuery = (document.getElementById('biz-search-input').value || '').toLowerCase().trim();
+      const statusFilter = document.getElementById('biz-status-filter').value;
+
+      const filtered = businessSales.filter(function (sale) {
+        let matchesStatus = true;
+        if (statusFilter === 'Discounted') {
+          matchesStatus = sale.discountPercent > 0;
+        } else if (statusFilter !== 'all') {
+          matchesStatus = sale.status === statusFilter;
+        }
+
+        const matchesQuery = !searchQuery ||
+          String(sale.customer || '').toLowerCase().includes(searchQuery) ||
+          String(sale.customerNo || '').toLowerCase().includes(searchQuery) ||
+          String(sale.receiptNo || '').toLowerCase().includes(searchQuery) ||
+          String(sale.block || '').toLowerCase().includes(searchQuery) ||
+          itemLabel(sale).toLowerCase().includes(searchQuery);
+
+        return matchesStatus && matchesQuery;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-zinc-500 text-xs font-mono uppercase">No matching orders found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(function (sale) {
+        const isPaid = sale.status === 'Paid';
+        const isDiscounted = sale.discountPercent > 0;
+        const badgeClasses = isPaid
+          ? 'bg-black text-white border-black'
+          : 'bg-white text-black border-black underline';
+
+        return '' +
+          '<tr class="hover:bg-zinc-50 transition">' +
+            '<td class="py-2.5 px-3">' +
+              '<div class="flex flex-wrap items-center gap-1.5">' +
+                '<span class="font-bold text-black text-xs uppercase">' + escapeHtml(sale.customer) + '</span>' +
+                (sale.customerNo ? '<span class="text-[9px] font-mono font-black border border-black px-1 bg-white">' + escapeHtml(sale.customerNo) + '</span>' : '') +
+                (sale.orderSequence ? '<span class="text-[9px] font-mono border border-black px-1 uppercase bg-zinc-100">P' + sale.orderSequence + '</span>' : '') +
+              '</div>' +
+              (isDiscounted ? '<div class="mt-0.5"><span class="text-[9px] font-mono font-bold uppercase border border-black bg-black text-white px-1">' + sale.discountPercent + '% 4th-Order Off</span></div>' : '') +
+            '</td>' +
+            '<td class="py-2.5 px-3 text-xs text-zinc-700">' +
+              '<span class="inline-flex items-center gap-1"><i class="ph-bold ph-map-pin text-black"></i> ' + escapeHtml(sale.block) + '</span>' +
+            '</td>' +
+            '<td class="py-2.5 px-3 text-xs text-black">' +
+              '<div class="font-bold uppercase text-[11px]">' + escapeHtml(sale.item) + '</div>' +
+              (sale.flavour ? '<div class="text-[10px] font-mono font-bold text-black uppercase">' + escapeHtml(sale.flavour) + '</div>' : '') +
+              '<div class="text-[10px] text-zinc-500 font-mono">' + sale.qty + ' pcs @ ' + formatRand(sale.unitPrice) + '</div>' +
+            '</td>' +
+            '<td class="py-2.5 px-3 text-xs text-zinc-600 font-mono">' +
+              '<div>' + escapeHtml(sale.date || '-') + '</div>' +
+              (sale.receiptNo ? '<div class="text-[9px] text-zinc-500">' + escapeHtml(sale.receiptNo) + '</div>' : '') +
+            '</td>' +
+            '<td class="py-2.5 px-3 text-right">' +
+              (isDiscounted && sale.subtotal ? '<div class="text-[10px] font-mono line-through text-zinc-400">' + formatRand(sale.subtotal) + '</div>' : '') +
+              '<div class="font-mono font-black text-xs text-black">' + formatRand(sale.total) + '</div>' +
+            '</td>' +
+            '<td class="py-2.5 px-3 text-center">' +
+              '<button onclick="toggleSaleStatus(\'' + escapeHtml(sale.id) + '\')" title="Click to toggle Paid/Owing" class="px-2.5 py-0.5 border text-[10px] font-mono font-bold uppercase transition hover:opacity-75 ' + badgeClasses + '">' +
+                (isPaid ? '[PAID]' : '[OWING]') +
+              '</button>' +
+            '</td>' +
+            '<td class="py-2.5 px-3 text-center">' +
+              '<div class="flex items-center justify-center gap-1">' +
+                '<button onclick="openSaleReceipt(\'' + escapeHtml(sale.id) + '\')" title="Receipt for customer" class="text-black hover:bg-black hover:text-white border border-black p-1 transition">' +
+                  '<i class="ph-bold ph-receipt"></i>' +
+                '</button>' +
+                '<button onclick="deleteSaleEntry(\'' + escapeHtml(sale.id) + '\')" title="Delete record (restores stock)" class="text-black hover:bg-black hover:text-white border border-black p-1 transition">' +
+                  '<i class="ph-bold ph-trash"></i>' +
+                '</button>' +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    function clearBusinessData() {
+      if (businessSales.length === 0) {
+        showToast('Business sales log already empty');
+        return;
+      }
+      if (!confirm('Delete ALL sales records? Stock levels, flavours and customer numbers (AWC001...) are kept. This cannot be undone.')) return;
+      businessSales = [];
+      saveBusinessData();
+      renderBusinessSection();
+      onCustomerNameInput();
+      showToast('All business sales cleared');
+    }
+
+    function exportBusinessData() {
+      if (businessSales.length === 0) {
+        showToast('No orders to export');
+        return;
+      }
+      downloadJSON(businessSales, 'HubblySales_' + localDateStr() + '.json');
+      showToast('Sales backup downloaded');
+    }
+
+    // ==========================================
+    // RECEIPTS
+    // ==========================================
+    function normalizePhone(p) {
+      let d = String(p || '').replace(/\D/g, '');
+      if (!d) return '';
+      if (d.indexOf('00') === 0) d = d.slice(2);
+      else if (d.charAt(0) === '0') d = '27' + d.slice(1);   // South African local format
+      return d;
+    }
+
+    function openSaleReceipt(saleId) {
+      const sale = businessSales.find(function (s) { return s.id === saleId; });
+      if (!sale) return;
+      currentReceipt = { type: 'single', saleId: saleId, customerNo: sale.customerNo };
+      openReceiptModal();
+    }
+
+    function openCustomerStatement(customerNo) {
+      currentReceipt = { type: 'statement', customerNo: customerNo };
+      openReceiptModal();
+    }
+
+    function openReceiptModal() {
+      if (!currentReceipt) return;
+      const cust = customers.find(function (c) { return c.no === currentReceipt.customerNo; });
+
+      document.getElementById('receipt-modal-title').innerText =
+        currentReceipt.type === 'single' ? 'Customer Receipt' : 'Account Statement';
+      document.getElementById('rcpt-phone').value = cust && cust.phone ? cust.phone : '';
+      document.getElementById('rcpt-business').value = receiptSettings.businessName || '';
+      document.getElementById('rcpt-contact').value = receiptSettings.contact || '';
+      document.getElementById('rcpt-note').value = receiptSettings.note || '';
+
+      renderReceiptPreview();
+      document.getElementById('receipt-modal').classList.remove('hidden');
+    }
+
+    function closeReceiptModal() {
+      const modal = document.getElementById('receipt-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function onReceiptSettingsChange() {
+      receiptSettings.businessName = document.getElementById('rcpt-business').value.trim();
+      receiptSettings.contact = document.getElementById('rcpt-contact').value.trim();
+      receiptSettings.note = document.getElementById('rcpt-note').value.trim();
+      saveReceiptSettings();
+      renderReceiptPreview();
+    }
+
+    function onReceiptPhoneChange() {
+      if (!currentReceipt) return;
+      const cust = customers.find(function (c) { return c.no === currentReceipt.customerNo; });
+      if (!cust) return;
+      cust.phone = document.getElementById('rcpt-phone').value.trim();
+      saveCustomers();
+    }
+
+    // Builds the data used for both the on-screen receipt and the text version
+    function buildReceiptData() {
+      const r = currentReceipt;
+      if (!r) return null;
+
+      const cust = customers.find(function (c) { return c.no === r.customerNo; }) || null;
+      const custSales = businessSales.filter(function (s) { return s.customerNo === r.customerNo; });
+
+      let paidAll = 0, dueAll = 0;
+      custSales.forEach(function (s) {
+        const t = parseFloat(s.total) || 0;
+        if (s.status === 'Paid') paidAll += t; else dueAll += t;
+      });
+
+      const base = {
+        type: r.type,
+        biz: receiptSettings,
+        customerNo: r.customerNo,
+        customerName: cust ? cust.name : '',
+        block: cust ? cust.block : '',
+        orderCount: custSales.length,
+        paidAll: round2(paidAll),
+        dueAll: round2(dueAll)
+      };
+
+      if (r.type === 'single') {
+        const s = businessSales.find(function (x) { return x.id === r.saleId; });
+        if (!s) return null;
+        const total = round2(parseFloat(s.total) || 0);
+        const subtotal = round2(parseFloat(s.subtotal) || ((parseFloat(s.qty) || 0) * (parseFloat(s.unitPrice) || 0)));
+        return Object.assign(base, {
+          purchaseNo: parseInt(s.orderSequence, 10) || (custSales.length - custSales.indexOf(s)),
+          docNo: s.receiptNo || '-',
+          date: s.date || localDateStr(),
+          customerName: s.customer,
+          block: s.block,
+          sale: s,
+          subtotal: subtotal,
+          discount: round2(Math.max(0, subtotal - total)),
+          discountPercent: s.discountPercent || 0,
+          total: total,
+          status: s.status
+        });
+      }
+
+      return Object.assign(base, {
+        docNo: 'ST-' + r.customerNo,
+        date: localDateStr(),
+        sales: custSales.slice().reverse(),     // oldest first
+        total: round2(paidAll + dueAll)
+      });
+    }
+
+    // Next purchase number that earns the loyalty discount (P4, P8, P12 ...)
+    function nextDiscountP(count) {
+      return (Math.floor(count / LOYALTY_EVERY) + 1) * LOYALTY_EVERY;
+    }
+
+    function loyaltyLine(d) {
+      const count = d.purchaseNo || d.orderCount;
+      const next = nextDiscountP(count);
+      let msg = '';
+      if (d.discountPercent > 0) msg += 'P' + count + ': ' + d.discountPercent + '% loyalty discount applied. ';
+      if (next - count === 1) msg += 'Your NEXT purchase (P' + next + ') is ' + LOYALTY_PERCENT + '% OFF!';
+      else msg += 'Every 4th purchase is ' + LOYALTY_PERCENT + '% off. Your next ' + LOYALTY_PERCENT + '% off: P' + next + '.';
+      return msg;
+    }
+
+    function showAccountLine(d) {
+      return d.dueAll > 0 && (d.status === 'Paid' || d.dueAll - d.total > 0.005);
+    }
+
+    // Purchase number of a sale inside a statement list (oldest first)
+    function statementPurchaseNo(s, index) {
+      return parseInt(s.orderSequence, 10) || (index + 1);
+    }
+
+    function receiptHtml(d) {
+      const b = d.biz;
+      const single = d.type === 'single';
+      const rule = '<div class="border-t-2 border-dashed border-black my-3"></div>';
+      const row = function (l, r, cls) {
+        return '<div class="flex justify-between gap-3 text-xs ' + (cls || '') + '"><span>' + l + '</span><span class="text-right">' + r + '</span></div>';
+      };
+
+      let h = '<div class="border-2 border-black bg-white p-5 font-mono text-black">';
+
+      // Logo + business
+      h += '<div class="mx-auto w-28 bg-black text-white text-center text-4xl font-black tracking-widest py-2">AWC</div>';
+      h += '<div class="text-center mt-2">' +
+             '<div class="text-[11px] font-black uppercase tracking-wide">' + escapeHtml(b.businessName || '') + '</div>' +
+             (b.contact ? '<div class="text-[10px] text-zinc-600 mt-0.5">' + escapeHtml(b.contact) + '</div>' : '') +
+           '</div>';
+      h += rule;
+      h += '<div class="text-center text-sm font-black uppercase tracking-widest">' + (single ? 'Order Slip' : 'Account Statement') + '</div>';
+
+      // Meta
+      h += '<div class="mt-3 space-y-1">' +
+             row('Order Number', '<b>' + escapeHtml(d.customerNo) + '</b>') +
+             row('Name', '<b>' + escapeHtml(d.customerName) + '</b>') +
+             (single
+               ? row('Purchase No.', '<b>P' + d.purchaseNo + '</b>' + (d.discountPercent > 0 ? ' <span class="border border-black px-1 font-black">' + d.discountPercent + '% OFF</span>' : ''))
+               : '') +
+             (d.block ? row('Block / Room', escapeHtml(d.block)) : '') +
+             row('Date', escapeHtml(d.date)) +
+             (single ? row('Slip No.', escapeHtml(d.docNo)) : '') +
+           '</div>';
+      h += rule;
+
+      if (single) {
+        const s = d.sale;
+        const paid = d.status === 'Paid';
+
+        // Item
+        h += '<div class="flex justify-between gap-3 text-xs">' +
+               '<div>' +
+                 '<div class="font-bold uppercase">' + escapeHtml(itemLabel(s)) + '</div>' +
+                 '<div class="text-[10px] text-zinc-600">' + s.qty + ' x ' + formatRand(s.unitPrice) + '</div>' +
+               '</div>' +
+               '<div class="font-black">' + formatRand(d.subtotal) + '</div>' +
+             '</div>';
+        h += rule;
+
+        // Totals
+        h += '<div class="space-y-1">';
+        if (d.discount > 0) {
+          h += row('Subtotal', formatRand(d.subtotal));
+          h += row('Discount (' + d.discountPercent + '%)', '-' + formatRand(d.discount));
+        }
+        h += row('<b class="text-sm">TOTAL</b>', '<b class="text-sm">' + formatRand(d.total) + '</b>');
+        h += '</div>';
+
+        h += '<div class="text-center mt-3"><span class="inline-block border-2 border-black px-3 py-1 text-sm font-black uppercase ' + (paid ? 'bg-black text-white' : 'bg-white text-black') + '">' +
+               (paid ? 'PAID IN FULL' : 'OWING: ' + formatRand(d.total)) +
+             '</span></div>';
+
+        if (showAccountLine(d)) {
+          h += '<div class="text-center text-[11px] font-bold mt-2">Total outstanding on your account: ' + formatRand(d.dueAll) + '</div>';
+        }
+
+        h += rule;
+        h += '<div class="text-[11px] text-center text-zinc-700">' + escapeHtml(loyaltyLine(d)) + '</div>';
+      } else {
+        // Statement lines
+        d.sales.forEach(function (s, i) {
+          const paid = s.status === 'Paid';
+          h += '<div class="flex justify-between gap-3 text-xs mb-2">' +
+                 '<div>' +
+                   '<div class="font-bold uppercase">P' + statementPurchaseNo(s, i) + ' &middot; ' + escapeHtml(itemLabel(s)) + ' x' + s.qty + '</div>' +
+                   '<div class="text-[10px] text-zinc-600">' + escapeHtml(s.date || '') + ' &middot; ' + escapeHtml(s.receiptNo || '') + '</div>' +
+                 '</div>' +
+                 '<div class="text-right">' +
+                   '<div class="font-black">' + formatRand(s.total) + '</div>' +
+                   '<div class="text-[10px] font-bold">[' + (paid ? 'PAID' : 'OWING') + ']</div>' +
+                 '</div>' +
+               '</div>';
+        });
+        h += rule;
+        h += '<div class="space-y-1">' +
+               row('Total purchases', formatRand(d.total)) +
+               row('Paid', formatRand(d.paidAll)) +
+               row('<b class="text-sm">OUTSTANDING</b>', '<b class="text-sm">' + formatRand(d.dueAll) + '</b>') +
+             '</div>';
+        h += '<div class="text-center mt-3"><span class="inline-block border-2 border-black px-3 py-1 text-sm font-black uppercase ' + (d.dueAll > 0 ? 'bg-white text-black' : 'bg-black text-white') + '">' +
+               (d.dueAll > 0 ? 'BALANCE DUE: ' + formatRand(d.dueAll) : 'ACCOUNT SETTLED') +
+             '</span></div>';
+      }
+
+      if (b.note) {
+        h += rule;
+        h += '<div class="text-center text-xs font-bold">' + escapeHtml(b.note) + '</div>';
+      }
+
+      h += '</div>';
+      return h;
+    }
+
+    function receiptText(d) {
+      const b = d.biz;
+      const line = '--------------------';
+      const L = [];
+
+      L.push('*AWC*');
+      if (b.businessName) L.push(b.businessName);
+      if (b.contact) L.push(b.contact);
+      L.push(line);
+
+      if (d.type === 'single') {
+        const s = d.sale;
+        L.push('*ORDER SLIP*');
+        L.push('Order Number: ' + d.customerNo);
+        L.push('Name: ' + d.customerName);
+        L.push('Purchase No: P' + d.purchaseNo + (d.discountPercent > 0 ? ' (' + d.discountPercent + '% OFF)' : ''));
+        if (d.block) L.push('Block/Room: ' + d.block);
+        L.push('Date: ' + d.date);
+        L.push('Slip No: ' + d.docNo);
+        L.push(line);
+        L.push(s.qty + ' x ' + itemLabel(s) + ' @ ' + formatRand(s.unitPrice) + ' = ' + formatRand(d.subtotal));
+        L.push(line);
+        if (d.discount > 0) {
+          L.push('Subtotal: ' + formatRand(d.subtotal));
+          L.push('Discount (' + d.discountPercent + '%): -' + formatRand(d.discount));
+        }
+        L.push('*TOTAL: ' + formatRand(d.total) + '*');
+        L.push(d.status === 'Paid'
+          ? 'Status: PAID - thank you!'
+          : '*Status: OWING - amount due ' + formatRand(d.total) + '*');
+        if (showAccountLine(d)) {
+          L.push('Total outstanding on your account: ' + formatRand(d.dueAll));
+        }
+        L.push(line);
+        L.push(loyaltyLine(d));
+      } else {
+        L.push('*ACCOUNT STATEMENT*');
+        L.push('Order Number: ' + d.customerNo);
+        L.push('Name: ' + d.customerName);
+        if (d.block) L.push('Block/Room: ' + d.block);
+        L.push('Date: ' + d.date);
+        L.push(line);
+        d.sales.forEach(function (s, i) {
+          L.push('P' + statementPurchaseNo(s, i) + ' | ' + (s.date || '') + ' | ' + itemLabel(s) + ' x' + s.qty + ' - ' + formatRand(s.total) + ' [' + (s.status === 'Paid' ? 'PAID' : 'OWING') + ']');
+        });
+        L.push(line);
+        L.push('Total purchases: ' + formatRand(d.total));
+        L.push('Paid: ' + formatRand(d.paidAll));
+        L.push('*OUTSTANDING: ' + formatRand(d.dueAll) + '*');
+      }
+
+      if (b.note) {
+        L.push(line);
+        L.push(b.note);
+      }
+      return L.join('\n');
+    }
+
+    // ==========================================
+    // PDF SLIP (downloads a real .pdf file)
+    // ==========================================
+    // jsPDF's built-in fonts only support basic Latin characters
+    function pdfSafe(t) {
+      return String(t == null ? '' : t)
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2013\u2014]/g, '-')
+        .replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '?');
+    }
+
+    // Draws the slip on an 80mm-wide page and returns the y position where it ended
+    function drawSlipPDF(doc, d) {
+      const W = 80, M = 6, R = W - M;
+      const b = d.biz;
+      const single = d.type === 'single';
+      let y = 8;
+
+      const ink = function () { doc.setTextColor(0, 0, 0); doc.setDrawColor(0, 0, 0); doc.setFillColor(0, 0, 0); };
+      const rule = function () {
+        y += 1;
+        doc.setLineWidth(0.3);
+        doc.setLineDashPattern([1, 1], 0);
+        doc.line(M, y, R, y);
+        doc.setLineDashPattern([], 0);
+        y += 4;
+      };
+      const center = function (text, size, bold) {
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(size);
+        doc.splitTextToSize(pdfSafe(text), W - 2 * M).forEach(function (l) {
+          doc.text(l, W / 2, y, { align: 'center' });
+          y += size * 0.45;
+        });
+      };
+      const row = function (label, value, bold, size) {
+        size = size || 8;
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(size);
+        doc.text(pdfSafe(label), M, y);
+        const lines = doc.splitTextToSize(pdfSafe(value), 44);
+        doc.text(lines, R, y, { align: 'right' });
+        y += Math.max(1, lines.length) * size * 0.45 + 0.9;
+      };
+      const statusBox = function (label, filled) {
+        doc.setLineWidth(0.5);
+        if (filled) {
+          doc.setFillColor(0, 0, 0);
+          doc.rect(M, y, R - M, 8, 'F');
+          doc.setTextColor(255, 255, 255);
+        } else {
+          doc.rect(M, y, R - M, 8);
+        }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(pdfSafe(label), W / 2, y + 5.6, { align: 'center' });
+        ink();
+        y += 12;
+      };
+
+      ink();
+
+      // AWC logo (black block, white letters)
+      doc.setFillColor(0, 0, 0);
+      doc.rect(W / 2 - 18, y, 36, 16, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(28);
+      doc.text('AWC', W / 2, y + 11.8, { align: 'center' });
+      ink();
+      y += 21;
+
+      if (b.businessName) center(b.businessName, 8, true);
+      if (b.contact) center(b.contact, 7, false);
+      rule();
+
+      y += 2;
+      center(single ? 'ORDER SLIP' : 'ACCOUNT STATEMENT', 10, true);
+      y += 2;
+
+      row('Order Number', d.customerNo, true);
+      row('Name', d.customerName, true);
+      if (single) row('Purchase No.', 'P' + d.purchaseNo + (d.discountPercent > 0 ? '  (' + d.discountPercent + '% OFF)' : ''), true);
+      if (d.block) row('Block / Room', d.block);
+      row('Date', d.date);
+      if (single) row('Slip No.', d.docNo);
+      rule();
+
+      if (single) {
+        const s = d.sale;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        const itemLines = doc.splitTextToSize(pdfSafe(itemLabel(s)), 44);
+        doc.text(itemLines, M, y);
+        doc.text(formatRand(d.subtotal), R, y, { align: 'right' });
+        y += itemLines.length * 3.7;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.text(s.qty + ' x ' + formatRand(s.unitPrice), M, y);
+        y += 3;
+        rule();
+
+        if (d.discount > 0) {
+          row('Subtotal', formatRand(d.subtotal));
+          row('Discount (' + d.discountPercent + '%)', '-' + formatRand(d.discount));
+        }
+        y += 1.5;
+        row('TOTAL', formatRand(d.total), true, 11);
+        y += 2;
+
+        const paid = d.status === 'Paid';
+        statusBox(paid ? 'PAID IN FULL' : 'OWING: ' + formatRand(d.total), paid);
+
+        if (showAccountLine(d)) {
+          center('Total outstanding on your account: ' + formatRand(d.dueAll), 7, true);
+          y += 1;
+        }
+        rule();
+        center(loyaltyLine(d), 7, false);
+      } else {
+        d.sales.forEach(function (s, i) {
+          const paid = s.status === 'Paid';
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          const lines = doc.splitTextToSize(pdfSafe('P' + statementPurchaseNo(s, i) + '  ' + itemLabel(s) + ' x' + s.qty), 44);
+          doc.text(lines, M, y);
+          doc.text(formatRand(s.total), R, y, { align: 'right' });
+          y += lines.length * 3.7;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.text(pdfSafe((s.date || '') + '  ' + (s.receiptNo || '')), M, y);
+          doc.text(paid ? '[PAID]' : '[OWING]', R, y, { align: 'right' });
+          y += 5;
+        });
+        rule();
+        row('Total purchases', formatRand(d.total));
+        row('Paid', formatRand(d.paidAll));
+        row('OUTSTANDING', formatRand(d.dueAll), true, 10);
+        y += 2;
+        statusBox(d.dueAll > 0 ? 'BALANCE DUE: ' + formatRand(d.dueAll) : 'ACCOUNT SETTLED', d.dueAll <= 0);
+      }
+
+      if (b.note) {
+        y += 1;
+        center(b.note, 7, true);
+      }
+      return y;
+    }
+
+    function downloadReceiptPDF() {
+      const d = buildReceiptData();
+      if (!d) return;
+
+      const lib = window.jspdf && window.jspdf.jsPDF;
+      if (!lib) {
+        showToast('PDF tool could not load (check internet). Opening print instead');
+        window.print();
+        return;
+      }
+
+      try {
+        // First pass measures the height so the slip page fits the content exactly
+        const probe = new lib({ unit: 'mm', format: [80, 1000] });
+        const endY = drawSlipPDF(probe, d);
+
+        const doc = new lib({ unit: 'mm', format: [80, Math.max(100, endY + 8)] });
+        drawSlipPDF(doc, d);
+
+        const fname = d.type === 'single'
+          ? 'Slip_' + d.customerNo + '_P' + d.purchaseNo + '.pdf'
+          : 'Statement_' + d.customerNo + '.pdf';
+        doc.save(fname);
+        showToast('PDF downloaded: ' + fname);
+      } catch (err) {
+        console.error(err);
+        showToast('Could not create the PDF');
+      }
+    }
+
+    function renderReceiptPreview() {
+      const el = document.getElementById('receipt-preview');
+      const d = buildReceiptData();
+      if (!d) {
+        el.innerHTML = '<div class="text-xs font-mono text-zinc-500 uppercase text-center py-6">Receipt not found</div>';
+        return;
+      }
+      el.innerHTML = receiptHtml(d);
+    }
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('Receipt text copied');
+      } catch (err) {
+        showToast('Copy failed - select the text manually');
+      }
+      ta.remove();
+    }
+
+    function copyReceiptText() {
+      const d = buildReceiptData();
+      if (!d) return;
+      const text = receiptText(d);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(function () { showToast('Receipt text copied'); })
+          .catch(function () { fallbackCopy(text); });
+      } else {
+        fallbackCopy(text);
+      }
+    }
+
+    function shareReceipt() {
+      const d = buildReceiptData();
+      if (!d) return;
+      const text = receiptText(d);
+      if (navigator.share) {
+        navigator.share({ title: (d.type === 'single' ? 'Receipt ' : 'Statement ') + d.docNo, text: text })
+          .catch(function () { /* cancelled */ });
+      } else {
+        copyReceiptText();
+        showToast('Sharing not supported here - text copied instead');
+      }
+    }
+
+    function sendReceiptWhatsApp() {
+      const d = buildReceiptData();
+      if (!d) return;
+      const phone = normalizePhone(document.getElementById('rcpt-phone').value);
+      const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(receiptText(d));
+      window.open(url, '_blank');
+      if (!phone) showToast('No number saved - pick the contact in WhatsApp');
+    }
+
+    function printReceipt() {
+      window.print();
+    }
+
+    function renderAll() {
+      renderFinanceSection();
+      renderBusinessSection();
+    }
+  </script>
+</body>
+</html>
